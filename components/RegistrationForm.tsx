@@ -9,7 +9,7 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
   const [done, setDone] = useState(false);
 
   // URL ของ n8n Webhook ที่คุณตั้งไว้
-  const N8N_URL = "https://mavis-untolerating-overcarefully.ngrok-free.dev/webhook/register";
+  const N8N_URL = "https://safemind.app.n8n.cloud/webhook/register";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -24,7 +24,7 @@ const AdminDashboard: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
 
   // ⚠️ ตรวจสอบ URL ให้ตรงกับของคุณ (ไม่มี /get-pending-users ต่อท้าย)
-  const N8N_BASE_URL = "https://mavis-untolerating-overcarefully.ngrok-free.dev/webhook";
+  const N8N_BASE_URL = "https://safemind.app.n8n.cloud/webhook";
 
   const fetchUsers = async () => {
     setLoading(true);
