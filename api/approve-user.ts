@@ -36,8 +36,8 @@ export default async function handler(req: any, res: any) {
         // 2. Change LINE Rich Menu
         const lineToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
         if (lineToken) {
-            // The Rich Menu ID from n8n approve.json
-            const richMenuId = 'richmenu-bd4e1f7fac9c51e1ab7c369d105fba48';
+            // The Rich Menu ID from n8n approve.json (Replaced with new 6-grid menu: Richsafemind.png)
+            const richMenuId = 'richmenu-ec11b584f4a2b30de3bbe331403c1aec';
             await axios.post(
                 `https://api.line.me/v2/bot/user/${line_user_id}/richmenu/${richMenuId}`,
                 {},
@@ -53,7 +53,7 @@ export default async function handler(req: any, res: any) {
 
         return res.status(200).json({ success: true, message: 'Approved!' });
     } catch (error: any) {
-        console.error('Approve Error:', error);
-        return res.status(500).json({ error: 'Internal Server Error', details: error.message });
+        console.error('Approve Error:', error?.response?.data || error.message);
+        return res.status(500).json({ error: 'Internal Server Error', details: error?.response?.data || error.message });
     }
 }
