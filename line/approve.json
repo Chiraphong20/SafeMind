@@ -1,0 +1,156 @@
+{
+  "name": "approve",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "approve-user",
+        "responseMode": "responseNode",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Access-Control-Allow-Methods",
+                "value": "GET, POST, OPTIONS"
+              },
+              {
+                "name": "Access-Control-Allow-Headers",
+                "value": "Content-Type, ngrok-skip-browser-warning"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "4383c813-ee8e-47aa-8ae8-c2575de43d9d",
+      "name": "Webhook",
+      "webhookId": "0fdc2df0-09d2-4747-8b97-a40b4d294e2f"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE users\nSET status = 'approved'\nWHERE line_user_id = '{{ $json.body.line_user_id }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        208,
+        0
+      ],
+      "id": "2c984a04-574e-462e-a38d-33acf19c216b",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "UWReaJOfmuyNhyC0",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.line.me/v2/bot/user/{{ $node[\"Webhook\"].json[\"body\"][\"line_user_id\"] }}/richmenu/richmenu-bd4e1f7fac9c51e1ab7c369d105fba48",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        400,
+        -16
+      ],
+      "id": "aa09cb93-a929-4e5c-8b36-ac188968bd0f",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "fwfqZRh45TouqrRx",
+          "name": "LINE Bot Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"success\": true, \"message\": \"Approved!\" }",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        608,
+        -16
+      ],
+      "id": "1cc966d1-3201-419c-bd11-b174e2255521",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "04b150c9-cef1-4973-bf06-b8b99787ab2e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8f487fa11d8c500085b05a77067e1944921616a9ab6ab4b19f9e6de9afda2b6b"
+  },
+  "id": "GS_4umhQU5YZvzl-_TKs-",
+  "tags": []
+}

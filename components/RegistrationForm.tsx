@@ -8,16 +8,16 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
 
-  // URL ของ n8n Webhook ที่คุณตั้งไว้
-  const N8N_URL = "https://safemind.app.n8n.cloud/webhook/register";
+  // URL ของ Vercel Serverless Function (Backend ภายในโปรเจกต์)
+  const API_URL = "/api/register";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!lineUserId) return alert("กรุณารอโหลดข้อมูล LINE Profile สักครู่ครับ");
-    
+
     setLoading(true);
     try {
-      const response = await fetch(N8N_URL, {
+      const response = await fetch(API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
         body: JSON.stringify({
@@ -42,7 +42,7 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
     <div className="max-w-md mx-auto bg-white p-10 rounded-3xl shadow-xl text-center border border-teal-50 animate-in fade-in zoom-in duration-500">
       <div className="flex justify-center mb-6"><CheckCircle2 className="w-20 h-20 text-teal-500" /></div>
       <h2 className="text-2xl font-bold mb-2">ลงทะเบียน SafeMind สำเร็จ</h2>
-      <p className="text-slate-500 text-sm mb-8">ข้อมูลของคุณเข้าสู่ระบบเรียบร้อยแล้ว<br/>เจ้าหน้าที่จะทำการอนุมัติในไม่ช้าครับ</p>
+      <p className="text-slate-500 text-sm mb-8">ข้อมูลของคุณเข้าสู่ระบบเรียบร้อยแล้ว<br />เจ้าหน้าที่จะทำการอนุมัติในไม่ช้าครับ</p>
       <button onClick={() => window.location.reload()} className="w-full py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition">ปิดหน้าต่างนี้</button>
     </div>
   );
@@ -64,20 +64,20 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
         <div className="space-y-4">
           <div className="relative">
             <User className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
-            <input type="text" placeholder="ชื่อ-นามสกุล" required className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition" 
-              onChange={e => setFormData({...formData, fullName: e.target.value})} />
+            <input type="text" placeholder="ชื่อ-นามสกุล" required className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition"
+              onChange={e => setFormData({ ...formData, fullName: e.target.value })} />
           </div>
 
           <div className="relative">
             <Phone className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
-            <input type="tel" placeholder="เบอร์โทรศัพท์" required pattern="0[0-9]{9}" className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition" 
-              onChange={e => setFormData({...formData, phone: e.target.value})} />
+            <input type="tel" placeholder="เบอร์โทรศัพท์" required pattern="0[0-9]{9}" className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition"
+              onChange={e => setFormData({ ...formData, phone: e.target.value })} />
           </div>
 
           <div className="relative">
             <Building2 className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
-            <input type="text" placeholder="หน่วยงาน/สังกัด" required className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition" 
-              onChange={e => setFormData({...formData, organization: e.target.value})} />
+            <input type="text" placeholder="หน่วยงาน/สังกัด" required className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition"
+              onChange={e => setFormData({ ...formData, organization: e.target.value })} />
           </div>
         </div>
 

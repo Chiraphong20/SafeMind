@@ -1,0 +1,120 @@
+{
+  "name": "Admin Fetch Data",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "get-pending-users",
+        "responseMode": "responseNode",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Access-Control-Allow-Methods",
+                "value": "GET, POST, OPTIONS"
+              },
+              {
+                "name": "Access-Control-Allow-Headers",
+                "value": "Content-Type, ngrok-skip-browser-warning"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "dbbf62a3-b028-4870-877f-cfde9e1481e5",
+      "name": "Webhook",
+      "webhookId": "da92b1bf-773f-4056-9e78-8583722e1acf"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT line_user_id, name, department, phone, status \nFROM users \nWHERE status = 'pending' \nORDER BY created_at DESC;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        208,
+        0
+      ],
+      "id": "87d28f12-5608-4109-b44f-7a42cd68e7e5",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "UWReaJOfmuyNhyC0",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        416,
+        0
+      ],
+      "id": "dbfd8458-7685-4f56-ac66-e060ca2a763c",
+      "name": "Respond to Webhook1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "da836fb8-08a1-4e33-93a0-96ae2bee05e6",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8f487fa11d8c500085b05a77067e1944921616a9ab6ab4b19f9e6de9afda2b6b"
+  },
+  "id": "OAeAaFPIIdPF3VtRalMbs",
+  "tags": []
+}

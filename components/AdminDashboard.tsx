@@ -23,22 +23,22 @@ const AdminDashboard: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // ⚠️ ตรวจสอบ URL ให้ตรงกับของคุณ (ไม่มี /get-pending-users ต่อท้าย)
-  const N8N_BASE_URL = "https://safemind.app.n8n.cloud/webhook";
+  // Base URL สำหรับ Vercel Serverless API
+  const API_BASE_URL = "/api";
 
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      // 1. เรียกข้อมูลจาก n8n
-      const response = await fetch(`${N8N_BASE_URL}/get-pending-users`, {
-        headers: { 
-            'ngrok-skip-browser-warning': 'true',
-            'Content-Type': 'application/json'
+      // 1. เรียกข้อมูลจาก Vercel API
+      const response = await fetch(`${API_BASE_URL}/get-pending-users`, {
+        headers: {
+          'ngrok-skip-browser-warning': 'true',
+          'Content-Type': 'application/json'
         }
       });
 
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      
+
       const rawData = await response.json();
       console.log("Raw Data from n8n:", rawData); // เช็คดูใน Console ว่าข้อมูลมาไหม
 
@@ -46,14 +46,14 @@ const AdminDashboard: React.FC = () => {
       if (Array.isArray(rawData)) {
         const formattedData: UserRegistration[] = rawData.map((user: any) => ({
           // ฝั่งซ้ายคือชื่อใน React : ฝั่งขวาคือชื่อจาก n8n (Database)
-          id: user.line_user_id,          
-          fullName: user.name,            
-          phone: user.phone,              
-          organization: user.department,  
+          id: user.line_user_id,
+          fullName: user.name,
+          phone: user.phone,
+          organization: user.department,
           status: user.status === 'approved' ? UserStatus.APPROVED : UserStatus.PENDING,
           timestamp: Date.now()
         }));
-        
+
         setUsers(formattedData);
       } else {
         setUsers([]);
@@ -74,27 +74,27 @@ const AdminDashboard: React.FC = () => {
     if (!window.confirm("ยืนยันการอนุมัติสมาชิก SafeMind ท่านนี้?")) return;
 
     try {
-      const response = await fetch(`${N8N_BASE_URL}/approve-user`, {
+      const response = await fetch(`${API_BASE_URL}/approve-user`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          'ngrok-skip-browser-warning': 'true' 
+          'ngrok-skip-browser-warning': 'true'
         },
         body: JSON.stringify({ line_user_id: userId })
       });
 
       if (response.ok) {
-  alert("✅ อนุมัติเรียบร้อย!");
-  // 🔥 อัปเดต State ในเครื่องทันที ไม่ต้องรอดึงข้อมูลใหม่
-  setUsers(prevUsers => prevUsers.filter(user => user.id !== userId));
-}
+        alert("✅ อนุมัติเรียบร้อย!");
+        // 🔥 อัปเดต State ในเครื่องทันที ไม่ต้องรอดึงข้อมูลใหม่
+        setUsers(prevUsers => prevUsers.filter(user => user.id !== userId));
+      }
     } catch (error) {
       alert("เกิดข้อผิดพลาดในการอนุมัติ");
     }
   };
 
-  const filteredUsers = users.filter(u => 
-    u.fullName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+  const filteredUsers = users.filter(u =>
+    u.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     u.phone.includes(searchTerm)
   );
 
@@ -124,47 +124,46 @@ const AdminDashboard: React.FC = () => {
           </thead>
           <tbody>
             {filteredUsers.length === 0 ? (
-                <tr>
-                    <td colSpan={4} className="p-8 text-center text-slate-400">
-                        ไม่พบข้อมูลสมาชิก
-                    </td>
-                </tr>
+              <tr>
+                <td colSpan={4} className="p-8 text-center text-slate-400">
+                  ไม่พบข้อมูลสมาชิก
+                </td>
+              </tr>
             ) : (
-                filteredUsers.map((user) => (
+              filteredUsers.map((user) => (
                 <tr key={user.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
-                    <td className="p-4">
+                  <td className="p-4">
                     <div className="font-bold text-slate-800">{user.fullName}</div>
                     <div className="text-xs text-slate-400 flex items-center gap-1 mt-1">
-                        <Phone size={12}/> {user.phone}
+                      <Phone size={12} /> {user.phone}
                     </div>
-                    </td>
-                    <td className="p-4 text-slate-600">
-                        <div className="flex items-center gap-2">
-                            <Building2 size={14} className="text-slate-400"/> 
-                            {user.organization}
-                        </div>
-                    </td>
-                    <td className="p-4">
-                        <span className={`px-2 py-1 rounded-full text-xs font-bold ${
-                            user.status === UserStatus.APPROVED 
-                            ? 'bg-green-100 text-green-700' 
-                            : 'bg-yellow-100 text-yellow-700'
-                        }`}>
-                            {user.status === UserStatus.APPROVED ? 'อนุมัติแล้ว' : 'รอตรวจสอบ'}
-                        </span>
-                    </td>
-                    <td className="p-4 text-right">
+                  </td>
+                  <td className="p-4 text-slate-600">
+                    <div className="flex items-center gap-2">
+                      <Building2 size={14} className="text-slate-400" />
+                      {user.organization}
+                    </div>
+                  </td>
+                  <td className="p-4">
+                    <span className={`px-2 py-1 rounded-full text-xs font-bold ${user.status === UserStatus.APPROVED
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-yellow-100 text-yellow-700'
+                      }`}>
+                      {user.status === UserStatus.APPROVED ? 'อนุมัติแล้ว' : 'รอตรวจสอบ'}
+                    </span>
+                  </td>
+                  <td className="p-4 text-right">
                     {user.status === UserStatus.PENDING && (
-                        <button 
-                            onClick={() => handleApprove(user.id)}
-                            className="bg-teal-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-teal-700 transition shadow-sm flex items-center gap-2 ml-auto"
-                        >
-                            <UserCheck size={16} /> อนุมัติ
-                        </button>
+                      <button
+                        onClick={() => handleApprove(user.id)}
+                        className="bg-teal-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-teal-700 transition shadow-sm flex items-center gap-2 ml-auto"
+                      >
+                        <UserCheck size={16} /> อนุมัติ
+                      </button>
                     )}
-                    </td>
+                  </td>
                 </tr>
-                ))
+              ))
             )}
           </tbody>
         </table>

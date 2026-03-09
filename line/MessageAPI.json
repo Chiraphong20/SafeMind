@@ -1,0 +1,133 @@
+{
+  "name": "MessageAPI",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "line-push",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "fcd089a3-82b5-4e2f-bce9-b5c13dfd598f",
+      "name": "Webhook",
+      "webhookId": "69cf1036-5130-4fff-81db-57cdb1875b7d"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.events[0].type }}",
+                    "rightValue": "follow",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "f9499a99-4a3c-437f-b033-684610731bb0"
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        208,
+        0
+      ],
+      "id": "85fec927-2b43-4075-a163-6dd8805b94a2",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.line.me/v2/bot/message/reply",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"replyToken\": \"{{ $json.body.events[0].replyToken }}\",\n  \"messages\": [\n    {\n      \"type\": \"image\",\n      \"originalContentUrl\": \"https://safe-mind-eight.vercel.app/840732_0.png\",\n      \"previewImageUrl\": \"https://safe-mind-eight.vercel.app/840732_0.png\"\n    },\n    {\n      \"type\": \"text\",\n      \"text\": \"สวัสดีครับ! ยินดีต้อนรับสู่ SafeMind 💙\\n\\nเริ่มต้นใช้งานได้ง่ายๆ เพียงกดปุ่ม 'สมัครสมาชิก' ที่เมนูด้านล่างได้เลยครับ 👇\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        384,
+        0
+      ],
+      "id": "3b08b0c7-caea-47b0-93e7-a41e0c498af7",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "fwfqZRh45TouqrRx",
+          "name": "LINE Bot Token"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "5cce8350-2217-4393-ba22-0a4668e1610d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8f487fa11d8c500085b05a77067e1944921616a9ab6ab4b19f9e6de9afda2b6b"
+  },
+  "id": "e5kR9bHhXbcCYK6KopWgn",
+  "tags": []
+}

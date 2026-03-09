@@ -47,8 +47,7 @@ const PlaceholderPage = ({ title, icon: Icon, color }: any) => (
 
 function App() {
   const [userId, setUserId] = useState<string>('');
-  const [error, setError] = useState<string>('');
-  
+
   // ✅ เพิ่ม state: loading (เริ่มต้นเป็น true เสมอ เพื่อบังหน้าจอไว้ก่อน)
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -56,7 +55,7 @@ function App() {
     const initLiff = async () => {
       try {
         await liff.init({ liffId: "2009105092-WldkRhqH" });
-        
+
         if (!liff.isLoggedIn()) {
           liff.login(); // ถ้ายังไม่ล็อกอิน ให้เด้งไปล็อกอินก่อน (หน้านี้จะค้างที่ Loading)
         } else {
@@ -64,7 +63,8 @@ function App() {
           setUserId(profile.userId);
         }
       } catch (err: any) {
-        setError(err.message);
+        console.warn("LIFF Initialization failed (likely localhost or invalid setup). Using Mock User.");
+        setUserId("U_mock_local_user_" + Math.floor(Math.random() * 10000));
       } finally {
         // ✅ ไม่ว่าจะสำเร็จหรือพัง ให้ปิดหน้า Loading เสมอเมื่อจบกระบวนการ
         setLoading(false);
@@ -95,13 +95,6 @@ function App() {
         <NavBar />
 
         <main className="py-8 px-4 max-w-5xl mx-auto">
-          {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-100 text-red-600 rounded-2xl text-xs flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4" />
-              LIFF Error: {error}
-            </div>
-          )}
-
           <Routes>
             {/* หน้าแรก / Register */}
             <Route path="/" element={<RegistrationForm lineUserId={userId} />} />
@@ -120,7 +113,7 @@ function App() {
           </Routes>
         </main>
 
-        
+
       </div>
     </Router>
   );

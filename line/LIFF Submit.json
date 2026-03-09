@@ -1,0 +1,198 @@
+{
+  "name": "LIFF Submit",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "register",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -16,
+        0
+      ],
+      "id": "24cfc012-f0f0-41cb-8f9a-5a6d5cb6b99b",
+      "name": "Webhook",
+      "webhookId": "64dba07f-887a-4bc3-9ecd-0b19c248c05f",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.line.me/v2/bot/message/push",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"to\": \"{{ $('Webhook').item.json.body.line_user_id }}\",\n  \"messages\": [\n    {\n      \"type\": \"text\",\n      \"text\": \"✅ ระบบได้รับข้อมูลของท่านแล้ว\\nขณะนี้กำลังอยู่ระหว่างการตรวจสอบครับ\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        416,
+        0
+      ],
+      "id": "a396c817-2d00-40d1-9546-d0510c6cbb9a",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "fwfqZRh45TouqrRx",
+          "name": "LINE Bot Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "users",
+          "mode": "list",
+          "cachedResultName": "users"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "line_user_id": "={{ $json.body.line_user_id }}",
+            "name": "={{ $json.body.name }}",
+            "department": "={{ $json.body.department }}",
+            "phone": "={{ $json.body.phone }}",
+            "status": "pending"
+          },
+          "matchingColumns": [
+            "line_user_id"
+          ],
+          "schema": [
+            {
+              "id": "line_user_id",
+              "displayName": "line_user_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "department",
+              "displayName": "department",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "updated_at",
+              "displayName": "updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        208,
+        0
+      ],
+      "id": "4c851f5b-38bc-4643-b753-85410ad965b9",
+      "name": "Insert or update rows in a table",
+      "credentials": {
+        "postgres": {
+          "id": "UWReaJOfmuyNhyC0",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Insert or update rows in a table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert or update rows in a table": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "f98a81f7-0823-4460-b87d-cfd45b98b3fa",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8f487fa11d8c500085b05a77067e1944921616a9ab6ab4b19f9e6de9afda2b6b"
+  },
+  "id": "qLLY5c0AURTZ3hITaZTJ7",
+  "tags": []
+}
