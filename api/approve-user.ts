@@ -36,8 +36,8 @@ export default async function handler(req: any, res: any) {
         // 2. Change LINE Rich Menu
         const lineToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
         if (lineToken) {
-            // The Rich Menu ID from n8n approve.json (Replaced with new 6-grid menu: Richsafemind.png)
-            const richMenuId = 'richmenu-ec11b584f4a2b30de3bbe331403c1aec';
+            // The Rich Menu ID for Richsafemind (6-grid)
+            const richMenuId = 'richmenu-794d774ad8ceb72a578744bc6174616c';
             await axios.post(
                 `https://api.line.me/v2/bot/user/${line_user_id}/richmenu/${richMenuId}`,
                 {},
