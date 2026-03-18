@@ -1,10 +1,22 @@
 import React, { useState } from 'react';
-import { User, Phone, Building2, CheckCircle2, ShieldCheck, Loader2 } from 'lucide-react';
+import { User, Phone, CheckCircle2, ShieldCheck, Loader2, Lock, CreditCard, Briefcase, MapPin, Building2, FileText, ChevronDown } from 'lucide-react';
+import liff from '@line/liff';
 
 interface Props { lineUserId: string; }
 
 const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
-  const [formData, setFormData] = useState({ fullName: '', phone: '', organization: '' });
+  const [formData, setFormData] = useState({ 
+    password: '',
+    fullName: '', 
+    role: '', 
+    phone: '',
+    idCard: '',
+    note: '',
+    subdistrict: '',
+    village: '',
+    hospitalName: '',
+    policeStation: ''
+  });
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
 
@@ -16,21 +28,45 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
     if (!lineUserId) return alert("กรุณารอโหลดข้อมูล LINE Profile สักครู่ครับ");
 
     setLoading(true);
+    let displayName = "";
+    let email = "";
+    try {
+      if (liff.isLoggedIn()) {
+        const profile = await liff.getProfile();
+        displayName = profile.displayName;
+        const decodedToken = liff.getDecodedIDToken();
+        if (decodedToken && decodedToken.email) {
+          email = decodedToken.email;
+        }
+      }
+    } catch (err) {
+      console.warn("Could not fetch LIFF profile/email during submit", err);
+    }
+
     try {
       const response = await fetch(API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
         body: JSON.stringify({
           line_user_id: lineUserId,
+          line_display_name: displayName,
+          email: email,
+          password: formData.password,
           name: formData.fullName,
-          department: formData.organization,
+          role: formData.role,
           phone: formData.phone,
+          id_card: formData.idCard,
+          note: formData.note,
+          subdistrict: (formData.role === 'ปกครอง' || formData.role === 'อสม.') ? formData.subdistrict : '',
+          village: (formData.role === 'ปกครอง' || formData.role === 'อสม.') ? formData.village : '',
+          hospital_name: formData.role === 'รพ.สต.' ? formData.hospitalName : '',
+          police_station: formData.role === 'ตำรวจ' ? formData.policeStation : '',
           status: "pending"
         })
       });
 
       if (response.ok) setDone(true);
-      else throw new Error("n8n Connection Failed");
+      else throw new Error("API Connection Failed");
     } catch (err) {
       alert("เกิดข้อผิดพลาดในการส่งข้อมูล กรุณาลองใหม่ครับ");
     } finally {
@@ -48,37 +84,110 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
   );
 
   return (
-    <div className="max-w-md mx-auto bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100">
+    <div className="max-w-md mx-auto bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100 mb-8">
       <div className="bg-teal-600 p-8 text-white relative">
         <h2 className="text-2xl font-bold flex items-center gap-2">ลงทะเบียนเข้าใช้งาน <ShieldCheck className="w-6 h-6" /></h2>
         <p className="text-teal-100 text-sm mt-1">SafeMind: พื้นที่ปลอดภัยเพื่อสุขภาพใจที่ดีของคุณ</p>
       </div>
 
       <form onSubmit={handleSubmit} className="p-8 space-y-6">
-        {/* แถบสถานะ ID: ดักจับ UserId ให้เห็นกันจะๆ */}
         <div className={`p-3 rounded-2xl flex items-center gap-3 text-[10px] font-mono border transition-all ${lineUserId ? 'bg-teal-50 border-teal-100 text-teal-700' : 'bg-amber-50 border-amber-100 text-amber-700 animate-pulse'}`}>
           <div className={`w-2 h-2 rounded-full ${lineUserId ? 'bg-teal-500' : 'bg-amber-500'}`}></div>
           {lineUserId ? `Verified ID: ${lineUserId.substring(0, 16)}...` : 'Waiting for LINE Authorization...'}
         </div>
 
         <div className="space-y-4">
+          
+          <div className="relative">
+            <Lock className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
+            <input type="password" placeholder="รหัสผ่าน *" required minLength={4} className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition"
+              onChange={e => setFormData({ ...formData, password: e.target.value })} />
+          </div>
+
           <div className="relative">
             <User className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
-            <input type="text" placeholder="ชื่อ-นามสกุล" required className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition"
+            <input type="text" placeholder="ชื่อ-นามสกุล *" required className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition"
               onChange={e => setFormData({ ...formData, fullName: e.target.value })} />
           </div>
 
           <div className="relative">
+            <Briefcase className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
+            <select required className="w-full pl-12 pr-10 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition appearance-none text-slate-700"
+              value={formData.role}
+              onChange={e => setFormData({ ...formData, role: e.target.value, subdistrict: '', village: '', hospitalName: '', policeStation: '' })}>
+              <option value="" disabled>-- เลือกบทบาท * --</option>
+              <option value="รพ.สต.">รพ.สต.</option>
+              <option value="อสม.">อสม.</option>
+              <option value="ตำรวจ">ตำรวจ</option>
+              <option value="ปกครอง">ปกครอง</option>
+              <option value="ผู้ใช้งานทั่วไป">ผู้ใช้งานทั่วไป</option>
+            </select>
+            <div className="absolute right-4 top-4 pointer-events-none">
+              <ChevronDown className="w-5 h-5 text-slate-400" />
+            </div>
+          </div>
+
+          {/* Conditional Fields Based on Role */}
+          {(formData.role === 'ปกครอง' || formData.role === 'อสม.') && (
+            <div className="flex gap-4 animate-in fade-in zoom-in duration-300">
+              <div className="relative flex-1">
+                <MapPin className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
+                <input type="text" placeholder="ตำบล *" required className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition"
+                  value={formData.subdistrict} onChange={e => setFormData({ ...formData, subdistrict: e.target.value })} />
+              </div>
+              <div className="relative flex-1">
+                <MapPin className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
+                <input type="text" placeholder="หมู่ที่ *" required className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition"
+                  value={formData.village} onChange={e => setFormData({ ...formData, village: e.target.value })} />
+              </div>
+            </div>
+          )}
+
+          {formData.role === 'รพ.สต.' && (
+            <div className="relative animate-in fade-in zoom-in duration-300">
+              <Building2 className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
+              <input type="text" placeholder="ชื่อโรงพยาบาล *" required className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition"
+                value={formData.hospitalName} onChange={e => setFormData({ ...formData, hospitalName: e.target.value })} />
+            </div>
+          )}
+
+          {formData.role === 'ตำรวจ' && (
+            <div className="relative animate-in fade-in zoom-in duration-300">
+              <Building2 className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
+              <select required className="w-full pl-12 pr-10 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition appearance-none text-slate-700"
+                value={formData.policeStation}
+                onChange={e => setFormData({ ...formData, policeStation: e.target.value })}>
+                <option value="" disabled>-- เลือกสถานีตำรวจ * --</option>
+                <option value="สภ.ปากช่อง">สภ.ปากช่อง</option>
+                <option value="สภ.กลางดง">สภ.กลางดง</option>
+                <option value="สภ.หมูสี">สภ.หมูสี</option>
+                <option value="สภ.หนองสาหร่าย">สภ.หนองสาหร่าย</option>
+              </select>
+              <div className="absolute right-4 top-4 pointer-events-none">
+                <ChevronDown className="w-5 h-5 text-slate-400" />
+              </div>
+            </div>
+          )}
+
+          {/* Regular fields */}
+          <div className="relative">
             <Phone className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
-            <input type="tel" placeholder="เบอร์โทรศัพท์" required pattern="0[0-9]{9}" className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition"
+            <input type="tel" placeholder="เบอร์โทรศัพท์ *" required pattern="0[0-9]{9}" className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition"
               onChange={e => setFormData({ ...formData, phone: e.target.value })} />
           </div>
 
           <div className="relative">
-            <Building2 className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
-            <input type="text" placeholder="หน่วยงาน/สังกัด" required className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition"
-              onChange={e => setFormData({ ...formData, organization: e.target.value })} />
+            <CreditCard className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
+            <input type="text" placeholder="เลขบัตรประชาชน (ไม่บังคับ)" pattern="[0-9]{13}" className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition"
+              onChange={e => setFormData({ ...formData, idCard: e.target.value })} />
           </div>
+
+          <div className="relative">
+            <FileText className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
+            <input type="text" placeholder="หมายเหตุ (ไม่บังคับ)" className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition"
+              onChange={e => setFormData({ ...formData, note: e.target.value })} />
+          </div>
+
         </div>
 
         <button type="submit" disabled={!lineUserId || loading} className={`w-full py-4 rounded-2xl font-extrabold text-white shadow-lg transition-all flex justify-center items-center gap-2 ${lineUserId && !loading ? 'bg-teal-600 hover:bg-teal-700 shadow-teal-200 active:scale-95' : 'bg-slate-300 cursor-not-allowed'}`}>
