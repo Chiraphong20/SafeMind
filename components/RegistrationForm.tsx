@@ -4,10 +4,41 @@ import liff from '@line/liff';
 
 interface Props { lineUserId: string; }
 
+// --- Data for Pak Chong District ---
+const pakChongSubdistricts = [
+  'กลางดง', 'ขนงพระ', 'คลองม่วง', 'จันทึก', 'ปากช่อง', 'พญาเย็น',
+  'วังกะทะ', 'วังไทร', 'หนองน้ำแดง', 'หนองสาหร่าย', 'หมูสี', 'โป่งตาลอง'
+];
+
+// Mapping Subdistrict to number of villages for simple dropdown generation
+// For a real production app, you might want specific village names instead of numbers
+const villageCountBySubdistrict: Record<string, number> = {
+  'กลางดง': 15, 'ขนงพระ': 15, 'คลองม่วง': 11, 'จันทึก': 22, 'ปากช่อง': 22, 'พญาเย็น': 14,
+  'วังกะทะ': 24, 'วังไทร': 18, 'หนองน้ำแดง': 11, 'หนองสาหร่าย': 25, 'หมูสี': 19, 'โป่งตาลอง': 13
+};
+
+const pakChongHospitals = [
+  'รพ.ปากช่องนานา',
+  'รพ.สต.กลางดง', 'รพ.สต.ขนงพระใต้', 'รพ.สต.ขนงพระเหนือ', 'รพ.สต.คลองม่วง',
+  'รพ.สต.จันทึก', 'รพ.สต.ซับตารี', 'รพ.สต.ซับสมอทอด', 'รพ.สต.ท่ามะนาว',
+  'รพ.สต.นิคมสร้างตนเองลำตะคอง', 'รพ.สต.บุ่งเตย', 'รพ.สต.ปากช่อง', 'รพ.สต.พญาเย็น',
+  'รพ.สต.โป่งตาลอง', 'รพ.สต.มิตรภาพ', 'รพ.สต.วังกะทะ', 'รพ.สต.วังไทร',
+  'รพ.สต.ศิริสังข์', 'รพ.สต.หนองตะกู', 'รพ.สต.หนองน้ำแดง', 'รพ.สต.หนองมะค่า',
+  'รพ.สต.หนองสาหร่าย', 'รพ.สต.หมูสี'
+];
+
+const pakChongPoliceStations = [
+  'สภ.ปากช่อง',
+  'สภ.กลางดง',
+  'สภ.หมูสี',
+  'สภ.หนองสาหร่าย'
+];
+// ------------------------------------
+
 const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
   const [formData, setFormData] = useState({ 
-    password: '',
     fullName: '', 
+
     role: '', 
     phone: '',
     idCard: '',
@@ -51,7 +82,6 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
           line_user_id: lineUserId,
           line_display_name: displayName,
           email: email,
-          password: formData.password,
           name: formData.fullName,
           role: formData.role,
           phone: formData.phone,
@@ -99,12 +129,6 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
         <div className="space-y-4">
           
           <div className="relative">
-            <Lock className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
-            <input type="password" placeholder="รหัสผ่าน *" required minLength={4} className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition"
-              onChange={e => setFormData({ ...formData, password: e.target.value })} />
-          </div>
-
-          <div className="relative">
             <User className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
             <input type="text" placeholder="ชื่อ-นามสกุล *" required className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition"
               onChange={e => setFormData({ ...formData, fullName: e.target.value })} />
@@ -132,13 +156,32 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
             <div className="flex gap-4 animate-in fade-in zoom-in duration-300">
               <div className="relative flex-1">
                 <MapPin className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
-                <input type="text" placeholder="ตำบล *" required className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition"
-                  value={formData.subdistrict} onChange={e => setFormData({ ...formData, subdistrict: e.target.value })} />
+                <select required className="w-full pl-12 pr-8 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition appearance-none text-slate-700"
+                  value={formData.subdistrict} 
+                  onChange={e => setFormData({ ...formData, subdistrict: e.target.value, village: '' })}>
+                  <option value="" disabled>-- ตำบล * --</option>
+                  {pakChongSubdistricts.map(sd => (
+                    <option key={sd} value={sd}>{sd}</option>
+                  ))}
+                </select>
+                <div className="absolute right-3 top-4 pointer-events-none">
+                  <ChevronDown className="w-4 h-4 text-slate-400" />
+                </div>
               </div>
+
               <div className="relative flex-1">
                 <MapPin className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
-                <input type="text" placeholder="หมู่ที่ *" required className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition"
-                  value={formData.village} onChange={e => setFormData({ ...formData, village: e.target.value })} />
+                <select required disabled={!formData.subdistrict} className="w-full pl-12 pr-8 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition appearance-none text-slate-700 disabled:opacity-50"
+                  value={formData.village} 
+                  onChange={e => setFormData({ ...formData, village: e.target.value })}>
+                  <option value="" disabled>-- หมู่ที่ * --</option>
+                  {formData.subdistrict && Array.from({ length: villageCountBySubdistrict[formData.subdistrict] || 15 }, (_, i) => i + 1).map(v => (
+                    <option key={v} value={`หมู่ ${v}`}>หมู่ {v}</option>
+                  ))}
+                </select>
+                <div className="absolute right-3 top-4 pointer-events-none">
+                  <ChevronDown className="w-4 h-4 text-slate-400" />
+                </div>
               </div>
             </div>
           )}
@@ -146,8 +189,17 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
           {formData.role === 'รพ.สต.' && (
             <div className="relative animate-in fade-in zoom-in duration-300">
               <Building2 className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
-              <input type="text" placeholder="ชื่อโรงพยาบาล *" required className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition"
-                value={formData.hospitalName} onChange={e => setFormData({ ...formData, hospitalName: e.target.value })} />
+              <select required className="w-full pl-12 pr-10 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition appearance-none text-slate-700"
+                value={formData.hospitalName} 
+                onChange={e => setFormData({ ...formData, hospitalName: e.target.value })}>
+                <option value="" disabled>-- เลือกโรงพยาบาล/รพ.สต. * --</option>
+                {pakChongHospitals.map(hosp => (
+                  <option key={hosp} value={hosp}>{hosp}</option>
+                ))}
+              </select>
+              <div className="absolute right-4 top-4 pointer-events-none">
+                <ChevronDown className="w-5 h-5 text-slate-400" />
+              </div>
             </div>
           )}
 
@@ -158,10 +210,9 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
                 value={formData.policeStation}
                 onChange={e => setFormData({ ...formData, policeStation: e.target.value })}>
                 <option value="" disabled>-- เลือกสถานีตำรวจ * --</option>
-                <option value="สภ.ปากช่อง">สภ.ปากช่อง</option>
-                <option value="สภ.กลางดง">สภ.กลางดง</option>
-                <option value="สภ.หมูสี">สภ.หมูสี</option>
-                <option value="สภ.หนองสาหร่าย">สภ.หนองสาหร่าย</option>
+                {pakChongPoliceStations.map(ps => (
+                  <option key={ps} value={ps}>{ps}</option>
+                ))}
               </select>
               <div className="absolute right-4 top-4 pointer-events-none">
                 <ChevronDown className="w-5 h-5 text-slate-400" />
