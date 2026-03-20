@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, Phone, CheckCircle2, ShieldCheck, Loader2, Lock, CreditCard, Briefcase, MapPin, Building2, FileText, ChevronDown } from 'lucide-react';
+import { User, Phone, CheckCircle2, ShieldCheck, Loader2, Lock, CreditCard, Briefcase, MapPin, Building2, FileText, ChevronDown, Mail } from 'lucide-react';
 import liff from '@line/liff';
 
 interface Props { lineUserId: string; }
@@ -59,6 +59,7 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
   const [formData, setFormData] = useState({ 
     username: '',
     password: '',
+    email: '',
     fullName: '', 
 
     role: '', 
@@ -103,7 +104,7 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
         body: JSON.stringify({
           line_user_id: lineUserId,
           line_display_name: displayName,
-          email: email,
+          email: formData.email || email,
           name: formData.fullName,
           role: formData.role,
           phone: formData.phone,
@@ -175,6 +176,12 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
             <Lock className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
             <input type="password" placeholder="Password *" required className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition"
               onChange={e => setFormData({ ...formData, password: e.target.value })} />
+          </div>
+
+          <div className="relative">
+            <Mail className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
+            <input type="email" placeholder="อีเมล *" required className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition"
+              onChange={e => setFormData({ ...formData, email: e.target.value })} />
           </div>
           
           <div className="relative">
