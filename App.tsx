@@ -7,31 +7,7 @@ import { LayoutDashboard, UserPlus, ShieldCheck, MapPin, FileText, Calendar, Vid
 
 // --- Components ย่อย ---
 
-const NavBar = () => {
-  const location = useLocation();
-  const isActive = (path: string) => location.pathname.startsWith(path);
 
-  return (
-    <nav className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
-      <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-teal-600 rounded-lg flex items-center justify-center shadow-md">
-            <ShieldCheck className="text-white w-5 h-5" />
-          </div>
-          <span className="text-xl font-black tracking-tighter text-teal-700 hidden sm:block">SafeMind</span>
-        </div>
-        <div className="flex bg-slate-100 p-1 rounded-xl">
-          <Link to="/register" className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${isActive('/register') || isActive('/login') ? 'bg-white text-teal-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-            <UserPlus size={16} /> สมัคร
-          </Link>
-          <Link to="/admin" className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${isActive('/admin') ? 'bg-white text-teal-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-            <LayoutDashboard size={16} /> แอดมิน
-          </Link>
-        </div>
-      </div>
-    </nav>
-  );
-};
 
 const PlaceholderPage = ({ title, icon: Icon, color }: any) => (
   <div className={`min-h-[60vh] flex flex-col items-center justify-center ${color} rounded-2xl border-2 border-dashed m-4 animate-in fade-in duration-500`}>
@@ -52,6 +28,11 @@ function App() {
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
+    if (window.location.pathname.startsWith('/admin')) {
+      setLoading(false);
+      return;
+    }
+
     const initLiff = async () => {
       try {
         await liff.init({ liffId: "2009105092-WldkRhqH" });
@@ -92,7 +73,7 @@ function App() {
   return (
     <Router>
       <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
-        <NavBar />
+
 
         <main className="py-8 px-4 max-w-5xl mx-auto">
           <Routes>
