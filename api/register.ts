@@ -21,10 +21,11 @@ export default async function handler(req: any, res: any) {
 
     const { 
         line_user_id, line_display_name, email, name, role, phone, id_card, 
-        note, subdistrict, village, hospital_name, police_station 
+        note, subdistrict, village, hospital_name, police_station,
+        username, password
     } = req.body;
 
-    if (!line_user_id || !name || !phone) {
+    if (!line_user_id || !name || !phone || !username || !password || !id_card) {
         return res.status(400).json({ message: 'Missing required fields' });
     }
 
@@ -33,16 +34,18 @@ export default async function handler(req: any, res: any) {
         // Use upsert to handle cases where user might re-register before approval
         await sql`
       INSERT INTO users (
-        line_user_id, line_display_name, email, name, department, phone, id_card, 
+        username, password, line_user_id, line_display_name, email, name, department, phone, id_card, 
         note, subdistrict, village, hospital_name, police_station, status, 
         created_at, updated_at
       )
       VALUES (
-        ${line_user_id}, ${line_display_name}, ${email}, ${name}, ${role}, ${phone}, ${id_card}, 
+        ${username}, ${password}, ${line_user_id}, ${line_display_name}, ${email}, ${name}, ${role}, ${phone}, ${id_card}, 
         ${note}, ${subdistrict}, ${village}, ${hospital_name}, ${police_station}, 'pending', 
         NOW(), NOW()
       )
       ON CONFLICT (line_user_id) DO UPDATE SET
+        username = EXCLUDED.username,
+        password = EXCLUDED.password,
         line_display_name = EXCLUDED.line_display_name,
         email = EXCLUDED.email,
         name = EXCLUDED.name,

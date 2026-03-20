@@ -17,26 +17,48 @@ const villageCountBySubdistrict: Record<string, number> = {
   'วังกะทะ': 24, 'วังไทร': 18, 'หนองน้ำแดง': 11, 'หนองสาหร่าย': 25, 'หมูสี': 19, 'โป่งตาลอง': 13
 };
 
-const pakChongHospitals = [
-  'รพ.ปากช่องนานา',
-  'รพ.สต.กลางดง', 'รพ.สต.ขนงพระใต้', 'รพ.สต.ขนงพระเหนือ', 'รพ.สต.คลองม่วง',
-  'รพ.สต.จันทึก', 'รพ.สต.ซับตารี', 'รพ.สต.ซับสมอทอด', 'รพ.สต.ท่ามะนาว',
-  'รพ.สต.นิคมสร้างตนเองลำตะคอง', 'รพ.สต.บุ่งเตย', 'รพ.สต.ปากช่อง', 'รพ.สต.พญาเย็น',
-  'รพ.สต.โป่งตาลอง', 'รพ.สต.มิตรภาพ', 'รพ.สต.วังกะทะ', 'รพ.สต.วังไทร',
-  'รพ.สต.ศิริสังข์', 'รพ.สต.หนองตะกู', 'รพ.สต.หนองน้ำแดง', 'รพ.สต.หนองมะค่า',
-  'รพ.สต.หนองสาหร่าย', 'รพ.สต.หมูสี'
+const healthCenters = [
+  { id: 1, addressid: "302101", hospital_name: "รพ.สต.หนองมะค่า", subdistrict_name: "ต.ปากช่อง" },
+  { id: 2, addressid: "302102", hospital_name: "รพ.สต.กลางดง", subdistrict_name: "ต.กลางดง" },
+  { id: 3, addressid: "302107", hospital_name: "รพ.สต.ขนงพระเหนือ", subdistrict_name: "ต.ขนงพระ" },
+  { id: 4, addressid: "302107", hospital_name: "รพ.สต.ขนงพระใต้", subdistrict_name: "ต.ขนงพระ" },
+  { id: 5, addressid: "302109", hospital_name: "รพ.สต.คลองม่วง", subdistrict_name: "ต.คลองม่วง" },
+  { id: 6, addressid: "302109", hospital_name: "รพ.สต.ซับพลู", subdistrict_name: "ต.คลองม่วง" },
+  { id: 7, addressid: "302103", hospital_name: "รพ.สต.หนองกระทุ่ม", subdistrict_name: "ต.จันทึก" },
+  { id: 8, addressid: "302103", hospital_name: "รพ.สต.หนองไข่น้ำ", subdistrict_name: "ต.จันทึก" },
+  { id: 9, addressid: "302108", hospital_name: "รพ.สต.หนองคุ้ม", subdistrict_name: "ต.โป่งตาลอง" },
+  { id: 10, addressid: "302112", hospital_name: "รพ.สต.โนนกระโดน", subdistrict_name: "ต.พญาเย็น" },
+  { id: 11, addressid: "302105", hospital_name: "รพ.สต.ท่าช้าง", subdistrict_name: "ต.หมูสี" },
+  { id: 12, addressid: "302105", hospital_name: "รพ.สต.คลองดินดำ", subdistrict_name: "ต.หมูสี" },
+  { id: 13, addressid: "302104", hospital_name: "รพ.สต.วังกะทะ", subdistrict_name: "ต.วังกะทะ" },
+  { id: 14, addressid: "302104", hospital_name: "รพ.สต.หนองขวาง", subdistrict_name: "ต.วังกะทะ" },
+  { id: 15, addressid: "302111", hospital_name: "รพ.สต.วังไทร", subdistrict_name: "ต.วังไทร" },
+  { id: 16, addressid: "302111", hospital_name: "รพ.สต.ซับน้อย", subdistrict_name: "ต.วังไทร" },
+  { id: 17, addressid: "302110", hospital_name: "รพ.สต.หนองน้ำแดง", subdistrict_name: "ต.หนองน้ำแดง" },
+  { id: 18, addressid: "302106", hospital_name: "รพ.สต.บ่อทอง", subdistrict_name: "ต.หนองสาหร่าย" },
+  { id: 19, addressid: "302106", hospital_name: "รพ.สต.เฉลิมพระเกียรติฯ", subdistrict_name: "ต.หนองสาหร่าย" }
 ];
 
-const pakChongPoliceStations = [
-  'สภ.ปากช่อง',
-  'สภ.กลางดง',
-  'สภ.หมูสี',
-  'สภ.หนองสาหร่าย'
+const policeStations = [
+  { id: 1, station_name: "สภ.ปากช่อง", remark: "ต.ปากช่อง" },
+  { id: 2, station_name: "สภ.ปากช่อง", remark: "ต.จันทึก" },
+  { id: 3, station_name: "สภ.ปากช่อง", remark: "ต.ขนงพระ" },
+  { id: 4, station_name: "สภ.ปากช่อง", remark: "ต.หนองน้ำแดง" },
+  { id: 5, station_name: "สภ.หนองสาหร่าย", remark: "ต.หนองสาหร่าย" },
+  { id: 6, station_name: "สภ.หนองสาหร่าย", remark: "ต.วังไทร" },
+  { id: 7, station_name: "สภ.หนองสาหร่าย", remark: "ต.คลองม่วง" },
+  { id: 8, station_name: "สภ.หนองสาหร่าย", remark: "ต.วังกะทะ" },
+  { id: 9, station_name: "สภ.หมูสี", remark: "ต.หมูสี" },
+  { id: 10, station_name: "สภ.หมูสี", remark: "ต.โป่งตาลอง" },
+  { id: 11, station_name: "สภ.กลางดง", remark: "ต.กลางดง" },
+  { id: 12, station_name: "สภ.กลางดง", remark: "ต.พญาเย็น" }
 ];
 // ------------------------------------
 
 const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
   const [formData, setFormData] = useState({ 
+    username: '',
+    password: '',
     fullName: '', 
 
     role: '', 
@@ -45,8 +67,8 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
     note: '',
     subdistrict: '',
     village: '',
-    hospitalName: '',
-    policeStation: ''
+    healthCenterId: 0,
+    policeStationId: 0
   });
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
@@ -89,9 +111,24 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
           note: formData.note,
           subdistrict: (formData.role === 'ปกครอง' || formData.role === 'อสม.') ? formData.subdistrict : '',
           village: (formData.role === 'ปกครอง' || formData.role === 'อสม.') ? formData.village : '',
-          hospital_name: formData.role === 'รพ.สต.' ? formData.hospitalName : '',
-          police_station: formData.role === 'ตำรวจ' ? formData.policeStation : '',
-          status: "pending"
+          hospital_name: formData.role === 'รพ.สต.' ? healthCenters.find(h => h.id === formData.healthCenterId)?.hospital_name || '' : '',
+          police_station: formData.role === 'ตำรวจ' ? policeStations.find(p => p.id === formData.policeStationId)?.station_name || '' : '',
+          status: "pending",
+          username: formData.username,
+          password: formData.password,
+          full_name: formData.fullName,
+          thai_id: formData.idCard,
+          phone_number: formData.phone,
+          is_kyc_verified: "0",
+          role_id: 0,
+          line_id: "",
+          remark: formData.note,
+          register_type: 0,
+          addressid: "",
+          tmbpart: (formData.role === 'ปกครอง' || formData.role === 'อสม.') ? formData.subdistrict : '',
+          moopart: (formData.role === 'ปกครอง' || formData.role === 'อสม.') ? formData.village : '',
+          police_station_id: formData.role === 'ตำรวจ' ? formData.policeStationId : 0,
+          health_center_id: formData.role === 'รพ.สต.' ? formData.healthCenterId : 0
         })
       });
 
@@ -127,6 +164,18 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
         </div>
 
         <div className="space-y-4">
+
+          <div className="relative">
+            <User className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
+            <input type="text" placeholder="Username *" required className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition"
+              onChange={e => setFormData({ ...formData, username: e.target.value })} />
+          </div>
+
+          <div className="relative">
+            <Lock className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
+            <input type="password" placeholder="Password *" required className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition"
+              onChange={e => setFormData({ ...formData, password: e.target.value })} />
+          </div>
           
           <div className="relative">
             <User className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
@@ -138,7 +187,7 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
             <Briefcase className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
             <select required className="w-full pl-12 pr-10 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition appearance-none text-slate-700"
               value={formData.role}
-              onChange={e => setFormData({ ...formData, role: e.target.value, subdistrict: '', village: '', hospitalName: '', policeStation: '' })}>
+              onChange={e => setFormData({ ...formData, role: e.target.value, subdistrict: '', village: '', healthCenterId: 0, policeStationId: 0 })}>
               <option value="" disabled>-- เลือกบทบาท * --</option>
               <option value="รพ.สต.">รพ.สต.</option>
               <option value="อสม.">อสม.</option>
@@ -190,11 +239,11 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
             <div className="relative animate-in fade-in zoom-in duration-300">
               <Building2 className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
               <select required className="w-full pl-12 pr-10 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition appearance-none text-slate-700"
-                value={formData.hospitalName} 
-                onChange={e => setFormData({ ...formData, hospitalName: e.target.value })}>
+                value={formData.healthCenterId || ''} 
+                onChange={e => setFormData({ ...formData, healthCenterId: Number(e.target.value) })}>
                 <option value="" disabled>-- เลือกโรงพยาบาล/รพ.สต. * --</option>
-                {pakChongHospitals.map(hosp => (
-                  <option key={hosp} value={hosp}>{hosp}</option>
+                {healthCenters.map(hc => (
+                  <option key={hc.id} value={hc.id}>{hc.hospital_name} ({hc.subdistrict_name})</option>
                 ))}
               </select>
               <div className="absolute right-4 top-4 pointer-events-none">
@@ -207,11 +256,11 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
             <div className="relative animate-in fade-in zoom-in duration-300">
               <Building2 className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
               <select required className="w-full pl-12 pr-10 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition appearance-none text-slate-700"
-                value={formData.policeStation}
-                onChange={e => setFormData({ ...formData, policeStation: e.target.value })}>
+                value={formData.policeStationId || ''}
+                onChange={e => setFormData({ ...formData, policeStationId: Number(e.target.value) })}>
                 <option value="" disabled>-- เลือกสถานีตำรวจ * --</option>
-                {pakChongPoliceStations.map(ps => (
-                  <option key={ps} value={ps}>{ps}</option>
+                {policeStations.map(ps => (
+                  <option key={ps.id} value={ps.id}>{ps.station_name} ({ps.remark})</option>
                 ))}
               </select>
               <div className="absolute right-4 top-4 pointer-events-none">
@@ -229,7 +278,7 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
 
           <div className="relative">
             <CreditCard className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
-            <input type="text" placeholder="เลขบัตรประชาชน (ไม่บังคับ)" pattern="[0-9]{13}" className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition"
+            <input type="text" placeholder="เลขบัตรประชาชน *" required pattern="[0-9]{13}" className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition"
               onChange={e => setFormData({ ...formData, idCard: e.target.value })} />
           </div>
 
