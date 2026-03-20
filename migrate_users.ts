@@ -6,6 +6,8 @@ async function main() {
     try {
         await sql`
             ALTER TABLE users 
+            ADD COLUMN IF NOT EXISTS username VARCHAR(255),
+            ADD COLUMN IF NOT EXISTS password VARCHAR(255),
             ADD COLUMN IF NOT EXISTS line_display_name VARCHAR(255),
             ADD COLUMN IF NOT EXISTS email VARCHAR(255),
             ADD COLUMN IF NOT EXISTS id_card VARCHAR(20),
