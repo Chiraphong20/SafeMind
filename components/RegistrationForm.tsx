@@ -74,8 +74,19 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
 
-  // URL ของ Vercel Serverless Function (Backend ภายในโปรเจกต์)
-  const API_URL = "/api/register";
+  // URL ของ FastAPI Backend
+  const API_URL = "http://210.246.215.95:8000/register";
+
+  const getRoleId = (roleName: string) => {
+    switch (roleName) {
+      case 'รพ.สต.': return 6;
+      case 'อสม.': return 5;
+      case 'ตำรวจ': return 4;
+      case 'ปกครอง': return 3;
+      case 'ผู้ใช้งานทั่วไป': return 2;
+      default: return 2;
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,45 +109,49 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
     }
 
     try {
+      const isSubdistrictRole = formData.role === 'ปกครอง' || formData.role === 'อสม.';
+
+      const payload = {
+        username: formData.username,
+        password: formData.password,
+        full_name: formData.fullName,
+        thai_id: formData.idCard || null,
+        phone_number: formData.phone,
+        is_kyc_verified: "0",
+        role_id: getRoleId(formData.role),
+        email: formData.email || email || null,
+        line_id: null,
+        line_user_id: lineUserId || null,
+        remark: formData.note || null,
+        register_type: 0,
+        addressid: null,
+        chwpart: isSubdistrictRole ? "นครราชสีมา" : null,
+        amppart: isSubdistrictRole ? "ปากช่อง" : null,
+        tmbpart: isSubdistrictRole ? formData.subdistrict : null,
+        moopart: isSubdistrictRole ? formData.village : null,
+        police_station_id: formData.role === 'ตำรวจ' && formData.policeStationId ? formData.policeStationId : null,
+        health_center_id: formData.role === 'รพ.สต.' && formData.healthCenterId ? formData.healthCenterId : null
+      };
+
       const response = await fetch(API_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
-        body: JSON.stringify({
-          line_user_id: lineUserId,
-          line_display_name: displayName,
-          email: formData.email || email,
-          name: formData.fullName,
-          role: formData.role,
-          phone: formData.phone,
-          id_card: formData.idCard,
-          note: formData.note,
-          subdistrict: (formData.role === 'ปกครอง' || formData.role === 'อสม.') ? formData.subdistrict : '',
-          village: (formData.role === 'ปกครอง' || formData.role === 'อสม.') ? formData.village : '',
-          hospital_name: formData.role === 'รพ.สต.' ? healthCenters.find(h => h.id === formData.healthCenterId)?.hospital_name || '' : '',
-          police_station: formData.role === 'ตำรวจ' ? policeStations.find(p => p.id === formData.policeStationId)?.station_name || '' : '',
-          status: "pending",
-          username: formData.username,
-          password: formData.password,
-          full_name: formData.fullName,
-          thai_id: formData.idCard,
-          phone_number: formData.phone,
-          is_kyc_verified: "0",
-          role_id: 0,
-          line_id: "",
-          remark: formData.note,
-          register_type: 0,
-          addressid: "",
-          tmbpart: (formData.role === 'ปกครอง' || formData.role === 'อสม.') ? formData.subdistrict : '',
-          moopart: (formData.role === 'ปกครอง' || formData.role === 'อสม.') ? formData.village : '',
-          police_station_id: formData.role === 'ตำรวจ' ? formData.policeStationId : 0,
-          health_center_id: formData.role === 'รพ.สต.' ? formData.healthCenterId : 0
-        })
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(payload)
       });
 
-      if (response.ok) setDone(true);
-      else throw new Error("API Connection Failed");
-    } catch (err) {
-      alert("เกิดข้อผิดพลาดในการส่งข้อมูล กรุณาลองใหม่ครับ");
+      if (response.ok) {
+        setDone(true);
+      } else {
+        const errorData = await response.json();
+        console.error("API Error Response:", errorData);
+        throw new Error(errorData.detail?.[0]?.msg || "API Connection Failed");
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert(`เกิดข้อผิดพลาดในการส่งข้อมูล: ${err.message || 'กรุณาลองใหม่ครับ'}`);
     } finally {
       setLoading(false);
     }
