@@ -83,14 +83,33 @@ const SmiVTable: React.FC = () => {
           'Content-Type': 'application/json'
         };
 
-        // 1. ดึงข้อมูลรายการจากตาราง SMI-V
-        // ดึงให้ได้มากที่สุดที่ API อนุญาต (500)
-        const smivRes = await fetch(`${API_BASE_URL}/smi-v?limit=500`, { headers });
-        const smivData = await smivRes.json();
-        const smivItems: SmiV[] = Array.isArray(smivData) ? smivData : (smivData.items || []);
+        // 1. ดึงข้อมูลรายการจากตาราง SMI-V ทั้งหมด (เนื่องจาก API ไม่รองรับ sort=desc และ limit ได้แค่ 500)
+        let allSmivItems: SmiV[] = [];
+        let skip = 0;
+        
+        while (true) {
+          const smivRes = await fetch(`${API_BASE_URL}/smi-v?limit=500&skip=${skip}`, { headers });
+          if (!smivRes.ok) break;
+          const smivData = await smivRes.json();
+          const items: SmiV[] = Array.isArray(smivData) ? smivData : (smivData.items || []);
+          
+          if (items.length === 0) break;
+          allSmivItems = allSmivItems.concat(items);
+          skip += 500;
+        }
 
-        // 2. หาระยะ HN ที่อยู่ในรายการ SMI-V เพื่อที่จะไปดึงชื่อ
-        const uniqueHns = Array.from(new Set(smivItems.map(item => item.hn).filter(Boolean)));
+        // 2. เรียงลำดับจากวันที่ประเมินล่าสุด (entry_date) ให้อยู่บนสุดก่อน
+        allSmivItems.sort((a, b) => {
+          const dateA = new Date(a.entry_date || 0).getTime();
+          const dateB = new Date(b.entry_date || 0).getTime();
+          return dateB - dateA;
+        });
+
+        // 3. ตัดเอาเฉพาะ 100 รายการล่าสุดมาแสดงผล เพื่อไม่ให้หน้าเว็บค้างและลดภาระเซิร์ฟเวอร์
+        const recentSmivItems = allSmivItems.slice(0, 100);
+
+        // 4. หาระยะ HN ที่อยู่ใน 100 รายการล่าสุดเท่านั้น เพื่อที่จะไปดึงชื่อ
+        const uniqueHns = Array.from(new Set(recentSmivItems.map(item => item.hn).filter(Boolean)));
 
         // 3. เตรียมตัวแปร (Dictionary) สำหรับเก็บ HN -> ชื่อผู้ป่วย
         const patientMap: Record<string, string> = {};
@@ -115,19 +134,14 @@ const SmiVTable: React.FC = () => {
           );
         }
 
-        // 5. นำข้อมูล SMI-V มาประกอบร่าง (Map) กับชื่อผู้ป่วย
-        const mappedData: MappedSmiV[] = smivItems.map(item => ({
-          ...item,
-          // หากหาชื่อไม่เจอ ให้แสดง fallback text
-          pt_name: patientMap[item.hn] || "(ไม่มีในฐานข้อมูล Patient)"
-        }));
-
-        // 6. เรียงลำดับจากวันที่ประเมินล่าสุด (entry_date) ให้อยู่บนสุดเสมอ
-        mappedData.sort((a, b) => {
-          const dateA = new Date(a.entry_date || 0).getTime();
-          const dateB = new Date(b.entry_date || 0).getTime();
-          return dateB - dateA;
-        });
+        // 6. นำข้อมูล SMI-V 100 รายการล่าสุด มาประกอบร่าง (Map) กับชื่อผู้ป่วย
+        // และคัดเฉพาะคนที่มี "ชื่อ" และ "HN" อยู่ในฐานข้อมูล Patients แล้วจริงๆ เท่านั้น
+        const mappedData: MappedSmiV[] = recentSmivItems
+          .filter(item => Boolean(item.hn) && Boolean(patientMap[item.hn]))
+          .map(item => ({
+            ...item,
+            pt_name: patientMap[item.hn]
+          }));
 
         setData(mappedData);
 
