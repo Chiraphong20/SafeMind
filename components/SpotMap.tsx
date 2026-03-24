@@ -45,7 +45,7 @@ const TYPE_ICONS: Record<string, string> = {
   police:     '/police.png',
   school:     '/school.png',
   tourist:    '/tourist.png',
-  temple:     '/tourist.png', // fallback for temple
+  temple:     '/measure.png',
 };
 
 // Patient icons: chosen by sex × result
@@ -142,6 +142,10 @@ const SpotMap: React.FC = () => {
   const [selectedItem, setSelectedItem] = useState<{ name: string; sub?: string; type: 'patient' | 'place' } | null>(null);
   const [stats, setStats] = useState({ red: 0, yellow: 0, green: 0 });
 
+  // Area filters
+  const [selectedTmb, setSelectedTmb] = useState<string>('');
+  const [selectedMoo, setSelectedMoo] = useState<string>('');
+
   const API_BASE_URL = '/api/fastapi';
 
   // ─── Fetch patient SMI-V data ──────────────────────────────────────────
@@ -224,10 +228,14 @@ const SpotMap: React.FC = () => {
       patientMarkersRef.current.forEach(m => m.remove());
       patientMarkersRef.current = [];
 
-      const visible = patients.filter(p => activeFilters.has(p.result));
+      const visible = patients.filter(p =>
+        activeFilters.has(p.result) &&
+        (!selectedTmb || p.tmbpart === selectedTmb) &&
+        (!selectedMoo || p.moopart === selectedMoo)
+      );
       visible.forEach((pt) => {
         const iconUrl = getPatientIcon(pt.sex, pt.result);
-        const icon = L.icon({ iconUrl, iconSize: [36, 36], iconAnchor: [18, 36], popupAnchor: [0, -36] });
+        const icon = L.icon({ iconUrl, iconSize: [48, 48], iconAnchor: [24, 48], popupAnchor: [0, -48] });
         const marker = L.marker([pt.lat!, pt.lng!], { icon })
           .addTo(leafletMap.current)
           .bindPopup(`
@@ -241,7 +249,7 @@ const SpotMap: React.FC = () => {
         patientMarkersRef.current.push(marker);
       });
     });
-  }, [patients, activeFilters, loading]);
+  }, [patients, activeFilters, loading, selectedTmb, selectedMoo]);
 
   // ─── Important place markers ───────────────────────────────────────────
   useEffect(() => {
@@ -252,7 +260,7 @@ const SpotMap: React.FC = () => {
 
       IMPORTANT_PLACES.filter(p => activeLayers.has(p.type)).forEach((place) => {
         const iconUrl = TYPE_ICONS[place.type] || '/government.png';
-        const icon = L.icon({ iconUrl, iconSize: [34, 34], iconAnchor: [17, 34], popupAnchor: [0, -34] });
+        const icon = L.icon({ iconUrl, iconSize: [42, 42], iconAnchor: [21, 42], popupAnchor: [0, -42] });
         const marker = L.marker([place.lat, place.lng], { icon })
           .addTo(leafletMap.current)
           .bindPopup(`
@@ -300,7 +308,19 @@ const SpotMap: React.FC = () => {
     window.open(`https://www.google.com/maps/dir/${PAK_CHONG_CENTER.join(',')}/${wps.join('/')}`, '_blank');
   };
 
-  const filteredPts = patients.filter(p => activeFilters.has(p.result));
+  const filteredPts = patients.filter(p =>
+    activeFilters.has(p.result) &&
+    (!selectedTmb || p.tmbpart === selectedTmb) &&
+    (!selectedMoo || p.moopart === selectedMoo)
+  );
+
+  // Dynamic area option lists
+  const tmbOptions = Array.from(new Set(patients.map(p => p.tmbpart).filter(Boolean))).sort() as string[];
+  const mooOptions = Array.from(new Set(
+    patients
+      .filter(p => !selectedTmb || p.tmbpart === selectedTmb)
+      .map(p => p.moopart).filter(Boolean)
+  )).sort() as string[];
 
   return (
     <div className="flex h-full overflow-hidden rounded-xl shadow-sm border border-slate-200 bg-white" style={{ minHeight: '600px' }}>
@@ -338,6 +358,37 @@ const SpotMap: React.FC = () => {
               {r === 'สีแดง' ? '🔴 วิกฤต' : r === 'สีเหลือง' ? '🟡 เฝ้าระวัง' : '🟢 ปกติ'}
             </button>
           ))}
+          {/* Area filters */}
+          <div className="mt-2 space-y-1.5">
+            <div>
+              <label className="text-xs text-slate-400 font-bold mb-0.5 block">📍 ตำบล</label>
+              <select
+                value={selectedTmb}
+                onChange={e => { setSelectedTmb(e.target.value); setSelectedMoo(''); }}
+                className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-400"
+              >
+                <option value="">ทั้งหมด</option>
+                {tmbOptions.map(t => <option key={t} value={t}>ตำบล {t}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 font-bold mb-0.5 block">🏘️ หมู่บ้าน</label>
+              <select
+                value={selectedMoo}
+                onChange={e => setSelectedMoo(e.target.value)}
+                className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-400"
+              >
+                <option value="">ทั้งหมด</option>
+                {mooOptions.map(m => <option key={m} value={m}>หมู่ {m}</option>)}
+              </select>
+            </div>
+            {(selectedTmb || selectedMoo) && (
+              <button onClick={() => { setSelectedTmb(''); setSelectedMoo(''); }}
+                className="w-full text-xs text-slate-400 hover:text-red-500 flex items-center gap-1 justify-center py-1">
+                <X size={11} /> ล้าง Filter พื้นที่
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Place layers */}
