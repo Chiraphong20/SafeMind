@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { BellRing, HeartPulse } from 'lucide-react';
 
 // ============================================================
 // Interface ตรงตาม API Schema จริง
@@ -59,11 +60,14 @@ interface SmiV {
 // ข้อมูลหลังจาก Map ชื่อผู้ป่วยเข้ากับ SMI-V แล้ว
 interface MappedSmiV extends SmiV {
   pt_name: string;
+  // เพิ่ม tmbpart เพื่อเอาไว้ส่งไลน์แยกตามพื้นที่ อสม.
+  tmbpart?: string;
 }
 
 const SmiVTable: React.FC = () => {
   const [data, setData] = useState<MappedSmiV[]>([]);
   const [loading, setLoading] = useState(true);
+  const [notifying, setNotifying] = useState(false);
 
   // ใช้ Proxy Route ที่เราเซ็ตไว้ใน vercel.json และ vite.config.ts เพื่อแก้ปัญหา Mixed Content (HTTP -> HTTPS)
   const API_BASE_URL = "/api/fastapi";
@@ -111,8 +115,8 @@ const SmiVTable: React.FC = () => {
         // 4. หาระยะ HN ที่อยู่ใน 100 รายการล่าสุดเท่านั้น เพื่อที่จะไปดึงชื่อ
         const uniqueHns = Array.from(new Set(recentSmivItems.map(item => item.hn).filter(Boolean)));
 
-        // 3. เตรียมตัวแปร (Dictionary) สำหรับเก็บ HN -> ชื่อผู้ป่วย
-        const patientMap: Record<string, string> = {};
+        // 3. เตรียมตัวแปร (Dictionary) สำหรับเก็บ HN -> ชื่อผู้ป่วยและพื้นที่
+        const patientMap: Record<string, { pt_name: string; tmbpart: string }> = {};
 
         // 4. ทยอยดึงทีละ 10 Request พร้อมๆ กัน (Batch Processing) 
         // ป้องกัน Error 500 จากการที่ Vercel หรือ FastAPI รัน 100+ requests พร้อมกัน (DDOS ตัวเอง)
@@ -125,7 +129,10 @@ const SmiVTable: React.FC = () => {
                 const res = await fetch(`${API_BASE_URL}/patients/hn/${hn}`, { headers });
                 if (res.ok) {
                   const patient: Patient = await res.json();
-                  patientMap[hn] = patient.pt_name;
+                  patientMap[hn] = {
+                      pt_name: patient.pt_name || "(ไม่มีชื่อ)",
+                      tmbpart: patient.tmbpart || ""
+                  };
                 }
               } catch (e) {
                 // Ignore silent errors for individual missing patients
@@ -134,13 +141,14 @@ const SmiVTable: React.FC = () => {
           );
         }
 
-        // 6. นำข้อมูล SMI-V 100 รายการล่าสุด มาประกอบร่าง (Map) กับชื่อผู้ป่วย
+        // 6. นำข้อมูล SMI-V 100 รายการล่าสุด มาประกอบร่าง (Map) กับชื่อผู้ป่วยและตำบล
         // และคัดเฉพาะคนที่มี "ชื่อ" และ "HN" อยู่ในฐานข้อมูล Patients แล้วจริงๆ เท่านั้น
         const mappedData: MappedSmiV[] = recentSmivItems
           .filter(item => Boolean(item.hn) && Boolean(patientMap[item.hn]))
           .map(item => ({
             ...item,
-            pt_name: patientMap[item.hn]
+            pt_name: patientMap[item.hn].pt_name,
+            tmbpart: patientMap[item.hn].tmbpart
           }));
 
         setData(mappedData);
@@ -155,9 +163,49 @@ const SmiVTable: React.FC = () => {
     fetchAndMapData();
   }, []);
 
+  // ฟังก์ชันยิงหน้าต่าง Notification ผ่าน Vercel Serverless
+  const handleNotifyVHVs = async () => {
+      if (data.length === 0) return;
+      if (!window.confirm(`ระบบจะส่งแจ้งเตือนข้อมูลผู้ป่วย ${data.length} รายการนี้\nไปยังไลน์ของ อสม. ที่รับผิดชอบตามเขตตำบลอัตโนมัติ คุณแน่ใจหรือไม่?`)) return;
+
+      setNotifying(true);
+      try {
+          const res = await fetch('/api/notify-vhvs', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ patients: data })
+          });
+
+          const result = await res.json();
+          if (res.ok) {
+              alert(`✅ ส่งแจ้งเตือนสำเร็จครับ! (กระจายไปยัง อสม. เรียบร้อย)`);
+          } else {
+              alert(`❌ เกิดข้อผิดพลาด: ${result.error || result.message}`);
+          }
+      } catch (err) {
+          console.error("Notify VHVs Error:", err);
+          alert("เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์ส่งไลน์");
+      } finally {
+          setNotifying(false);
+      }
+  };
+
   return (
     <div className="p-6 bg-white rounded-xl shadow-sm border border-slate-200">
-      <h2 className="text-xl font-bold mb-4 text-slate-800">ข้อมูลประเมิน SMI-V พร้อมรายชื่อ</h2>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-3">
+            <div className="bg-teal-50 p-2 rounded-lg border border-teal-100"><HeartPulse className="text-teal-600" size={24} /></div>
+            <h2 className="text-2xl font-black text-slate-800 tracking-tight">ข้อมูลประเมิน SMI-V <span className="text-xl font-bold text-slate-400">พร้อมรายชื่อ</span></h2>
+        </div>
+        <button 
+            onClick={handleNotifyVHVs}
+            disabled={notifying || data.length === 0}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-sm transition-all shadow-blue-600/20 disabled:opacity-50"
+        >
+            <BellRing size={18} className={notifying ? "animate-bounce" : ""} />
+            {notifying ? "กำลังกระจายข้อมูล..." : "ส่งแจ้งเตือน อสม. ในพื้นที่"}
+        </button>
+      </div>
 
       {loading ? (
         <div className="text-slate-500">กำลังโหลดและจับคู่ข้อมูล...</div>
