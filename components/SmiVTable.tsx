@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { BellRing, HeartPulse, Users, ChevronLeft, MapPin, UserCheck, Loader2 } from 'lucide-react';
+import { BellRing, HeartPulse, Users, ChevronLeft, MapPin, UserCheck, Loader2, RefreshCw } from 'lucide-react';
 
 // ============================================================
 // Interfaces
@@ -79,35 +79,34 @@ const SmiVTable: React.FC = () => {
   const [loadingPatients, setLoadingPatients] = useState(false);
   const [notifying, setNotifying] = useState(false);
 
-  // ─── 1. Load ALL active non-admin users on mount ───────────────────────
-  useEffect(() => {
-    const loadUsers = async () => {
-      setLoadingUsers(true);
-      try {
-        const tokenRes = await fetch('/api/get-machine-token');
-        const { access_token } = await tokenRes.json();
-        const headers = { Authorization: `Bearer ${access_token}` };
+  // ─── 1. Load ALL active non-admin users ───────────────────────────────
+  const loadUsers = useCallback(async () => {
+    setLoadingUsers(true);
+    try {
+      const tokenRes = await fetch('/api/get-machine-token');
+      const { access_token } = await tokenRes.json();
+      const headers = { Authorization: `Bearer ${access_token}` };
 
-        // Fetch all roles except Admin (role_id=1) and general users (role_id=2)
-        const targetRoles = [3, 4, 5, 6];
-        const fetched: VHVUser[] = [];
+      const targetRoles = [3, 4, 5, 6];
+      const fetched: VHVUser[] = [];
 
-        for (const roleId of targetRoles) {
-          const res = await fetch(`${API_BASE_URL}/users?role_id=${roleId}&is_active=true&limit=500`, { headers });
-          if (!res.ok) continue;
-          const data = await res.json();
-          fetched.push(...(data.items || []));
-        }
-
-        setUsers(fetched);
-      } catch (e) {
-        console.error('loadUsers error:', e);
-      } finally {
-        setLoadingUsers(false);
+      for (const roleId of targetRoles) {
+        const res = await fetch(`${API_BASE_URL}/users?role_id=${roleId}&is_active=true&limit=500`, { headers });
+        if (!res.ok) continue;
+        const data = await res.json();
+        fetched.push(...(data.items || []));
       }
-    };
-    loadUsers();
-  }, []);
+
+      setUsers(fetched);
+    } catch (e) {
+      console.error('loadUsers error:', e);
+    } finally {
+      setLoadingUsers(false);
+    }
+  }, [API_BASE_URL]);
+
+  useEffect(() => { loadUsers(); }, [loadUsers]);
+
 
   // ─── 2. When user is selected → load their area's SMI-V patients ───────
   const loadPatientsForUser = useCallback(async (user: VHVUser) => {
@@ -208,16 +207,25 @@ const SmiVTable: React.FC = () => {
   if (!selectedUser) {
     return (
       <div className="p-6 bg-white rounded-xl shadow-sm border border-slate-200">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
-          <div className="bg-teal-50 p-2 rounded-lg border border-teal-100">
-            <Users className="text-teal-600" size={24} />
+          <div className="flex justify-between items-start mb-6">
+            <div className="flex items-center gap-3">
+              <div className="bg-teal-50 p-2 rounded-lg border border-teal-100">
+                <Users className="text-teal-600" size={24} />
+              </div>
+              <div>
+                <h2 className="text-2xl font-black text-slate-800 tracking-tight">เลือกผู้ใช้งาน</h2>
+                <p className="text-sm text-slate-400 mt-0.5">เลือก อสม. หรือเจ้าหน้าที่เพื่อดูผู้ป่วยในความดูแล</p>
+              </div>
+            </div>
+            <button
+              onClick={loadUsers}
+              disabled={loadingUsers}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl transition-all shadow-sm font-bold text-slate-600 text-sm"
+            >
+              <RefreshCw size={15} className={loadingUsers ? 'animate-spin text-teal-500' : ''} />
+              รีเฟรช
+            </button>
           </div>
-          <div>
-            <h2 className="text-2xl font-black text-slate-800 tracking-tight">เลือกผู้ใช้งาน</h2>
-            <p className="text-sm text-slate-400 mt-0.5">เลือก อสม. หรือเจ้าหน้าที่เพื่อดูผู้ป่วยในความดูแล</p>
-          </div>
-        </div>
 
         {loadingUsers ? (
           <div className="flex items-center gap-3 text-slate-500 py-10 justify-center">
