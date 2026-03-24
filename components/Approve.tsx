@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { UserCheck, RefreshCw, ShieldCheck, Phone, Building2, Users, TableProperties, LogOut } from 'lucide-react';
+import { UserCheck, RefreshCw, ShieldCheck, Phone, Building2, Users, TableProperties, LogOut, Map } from 'lucide-react';
 import SmiVTable from './SmiVTable';
+import SpotMap from './SpotMap';
 
 export enum UserStatus {
   PENDING = 'PENDING',
@@ -19,7 +20,7 @@ export interface UserRegistration {
 
 const Approve: React.FC = () => {
   // Layout State
-  const [activeTab, setActiveTab] = useState<'users' | 'smiv'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'smiv' | 'spotmap'>('users');
 
   // User List State
   const [users, setUsers] = useState<UserRegistration[]>([]);
@@ -134,6 +135,17 @@ const Approve: React.FC = () => {
                 <TableProperties size={20} className={activeTab === 'smiv' ? 'text-teal-600' : 'opacity-70'} />
                 ตารางประเมิน SMI-V
             </button>
+            <button 
+                onClick={() => setActiveTab('spotmap')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all duration-200 ${
+                    activeTab === 'spotmap' 
+                    ? 'bg-teal-50 text-teal-700 shadow-sm border border-teal-100' 
+                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+                }`}
+            >
+                <Map size={20} className={activeTab === 'spotmap' ? 'text-teal-600' : 'opacity-70'} />
+                Spot Map
+            </button>
         </nav>
 
         {/* Footer actions */}
@@ -236,6 +248,10 @@ const Approve: React.FC = () => {
                     </tbody>
                   </table>
                 </div>
+              </div>
+            ) : activeTab === 'spotmap' ? (
+              <div className="animate-in fade-in duration-500 h-full" style={{ height: 'calc(100vh - 5rem)' }}>
+                <SpotMap />
               </div>
             ) : (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 pb-24 h-full">
