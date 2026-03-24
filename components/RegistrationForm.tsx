@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, Phone, CheckCircle2, ShieldCheck, Loader2, Lock, CreditCard, Briefcase, MapPin, Building2, FileText, ChevronDown, Mail } from 'lucide-react';
+import { User, Phone, CheckCircle2, ShieldCheck, Loader2, Lock, CreditCard, Briefcase, MapPin, Building2, FileText, ChevronDown, Mail, MessageCircle } from 'lucide-react';
 import liff from '@line/liff';
 
 interface Props { lineUserId: string; }
@@ -66,6 +66,7 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
     password: '',
     email: '',
     fullName: '', 
+    lineId: '',
 
     role: '', 
     phone: '',
@@ -134,7 +135,7 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
         is_kyc_verified: "0",
         role_id: getRoleId(formData.role),
         email: formData.email || email || null,
-        line_id: null,
+        line_id: formData.lineId || null,
         line_user_id: lineUserId || null,
         remark: formData.note || null,
         register_type: 1,
@@ -318,6 +319,12 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
           )}
 
           {/* Regular fields */}
+          <div className="relative">
+            <MessageCircle className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
+            <input type="text" placeholder="LINE ID (ไม่บังคับ)" className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition"
+              onChange={e => setFormData({ ...formData, lineId: e.target.value })} />
+          </div>
+
           <div className="relative">
             <Phone className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
             <input type="tel" placeholder="เบอร์โทรศัพท์ *" required pattern="0[0-9]{9}" className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition"
