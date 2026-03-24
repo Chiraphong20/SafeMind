@@ -21,9 +21,12 @@ export default async function handler(req: any, res: any) {
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
     );
     const token = tokenRes.data.access_token;
-    const headers = { Authorization: `Bearer ${token}` };
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    };
 
-    // 2. If we only have line_user_id, find user_id first
+    // 2. Find user_id if not provided
     let targetUserId = user_id;
     let targetLineUserId = line_user_id;
 
@@ -36,13 +39,17 @@ export default async function handler(req: any, res: any) {
       targetLineUserId = found.line_user_id;
     }
 
-    // 3. Patch is_active = true via FastAPI
-    await axios.patch(`${FASTAPI}/users/${targetUserId}`,
-      { is_active: true },
-      { headers: { ...headers, 'Content-Type': 'application/json' } }
+    // 3. GET full user data first (PUT requires full body)
+    const userRes = await axios.get(`${FASTAPI}/users/${targetUserId}`, { headers });
+    const currentUser = userRes.data;
+
+    // 4. PUT with is_active = true (FastAPI requires full object for updates)
+    await axios.put(`${FASTAPI}/users/${targetUserId}`,
+      { ...currentUser, is_active: true },
+      { headers }
     );
 
-    // 4. Update LINE Rich Menu (best-effort)
+    // 5. Update LINE Rich Menu (best-effort)
     const lineToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
     if (lineToken && targetLineUserId) {
       const richMenuId = 'richmenu-794d774ad8ceb72a578744bc6174616c';
@@ -60,6 +67,9 @@ export default async function handler(req: any, res: any) {
     return res.status(200).json({ success: true, message: 'User approved!' });
   } catch (err: any) {
     console.error('approve-user error:', err.response?.data || err.message);
-    return res.status(500).json({ error: 'Internal Server Error', details: err.response?.data || err.message });
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      details: err.response?.data || err.message
+    });
   }
 }
