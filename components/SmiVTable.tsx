@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { BellRing, HeartPulse, Users, ChevronLeft, MapPin, UserCheck, Loader2, RefreshCw } from 'lucide-react';
+import { BellRing, HeartPulse, Users, ChevronLeft, MapPin, UserCheck, Loader2, RefreshCw, X } from 'lucide-react';
 
 // ============================================================
 // Interfaces
@@ -107,6 +107,36 @@ const SmiVTable: React.FC = () => {
 
   useEffect(() => { loadUsers(); }, [loadUsers]);
 
+  // ─── Deactivate user (set is_active=false via PUT) ───────────────────────────
+  const handleDeactivateUser = async (user: VHVUser, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!window.confirm(`ยกเลิกการใช้งานของ "${user.full_name}" ?
+ผู้ใช้นี้จะไม่สามารถล็อกอินหรือรับแจ้งเตือนได้`)) return;
+    try {
+      const tokenRes = await fetch('/api/get-machine-token');
+      const { access_token } = await tokenRes.json();
+      const headers = { Authorization: `Bearer ${access_token}`, 'Content-Type': 'application/json' };
+
+      // GET full user first (PUT requires full body)
+      const userRes = await fetch(`${API_BASE_URL}/users/${user.user_id}`, { headers });
+      const currentUser = await userRes.json();
+
+      // PUT with is_active = false
+      const putRes = await fetch(`${API_BASE_URL}/users/${user.user_id}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({ ...currentUser, is_active: false }),
+      });
+
+      if (putRes.ok) {
+        setUsers(prev => prev.filter(u => u.user_id !== user.user_id));
+      } else {
+        alert('เกิดข้อผิดพลาด กรุณาลองใหม่');
+      }
+    } catch {
+      alert('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    }
+  };
 
   // ─── 2. When user is selected → load their area's SMI-V patients ───────
   const loadPatientsForUser = useCallback(async (user: VHVUser) => {
@@ -237,11 +267,20 @@ const SmiVTable: React.FC = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {users.map((user) => (
-              <button
+              <div
                 key={user.user_id}
+                className="relative text-left p-4 rounded-xl border border-slate-200 hover:border-teal-300 hover:bg-teal-50 transition-all group cursor-pointer"
                 onClick={() => loadPatientsForUser(user)}
-                className="text-left p-4 rounded-xl border border-slate-200 hover:border-teal-300 hover:bg-teal-50 transition-all group"
               >
+                {/* Deactivate button */}
+                <button
+                  onClick={(e) => handleDeactivateUser(user, e)}
+                  className="absolute top-2 right-2 w-6 h-6 rounded-full bg-white border border-slate-200 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:border-red-300 hover:text-red-500 text-slate-400 transition-all z-10"
+                  title="ยกเลิกการใช้งาน"
+                >
+                  <X size={12} />
+                </button>
+
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center group-hover:bg-white transition-all border border-slate-200">
@@ -268,7 +307,7 @@ const SmiVTable: React.FC = () => {
                     <span>ตำบล {user.tmbpart} อำเภอ {user.amppart} จังหวัด {user.chwpart}</span>
                   </div>
                 )}
-              </button>
+              </div>
             ))}
           </div>
         )}
