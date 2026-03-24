@@ -20,12 +20,10 @@ export default async function handler(req: any, res: any) {
     }
 
     const { 
-        line_user_id, line_display_name, email, name, role, phone, id_card, 
-        note, subdistrict, village, hospital_name, police_station,
-        username, password
+        username, password, full_name, thai_id, phone_number, is_kyc_verified, role_id, email, line_id, line_user_id, remark, register_type, addressid, chwpart, amppart, tmbpart, moopart, police_station_id, health_center_id
     } = req.body;
 
-    if (!line_user_id || !name || !phone || !username || !password || !id_card) {
+    if (!line_user_id || !full_name || !phone_number || !username || !password || !thai_id) {
         return res.status(400).json({ message: 'Missing required fields' });
     }
 
@@ -34,29 +32,31 @@ export default async function handler(req: any, res: any) {
         // Use upsert to handle cases where user might re-register before approval
         await sql`
       INSERT INTO users (
-        username, password, line_user_id, line_display_name, email, name, department, phone, id_card, 
-        note, subdistrict, village, hospital_name, police_station, status, 
-        created_at, updated_at
+        username, password, full_name, thai_id, phone_number, is_kyc_verified, role_id, email, line_id, line_user_id, remark, register_type, addressid, chwpart, amppart, tmbpart, moopart, police_station_id, health_center_id, status, created_at, updated_at
       )
       VALUES (
-        ${username}, ${password}, ${line_user_id}, ${line_display_name}, ${email}, ${name}, ${role}, ${phone}, ${id_card}, 
-        ${note}, ${subdistrict}, ${village}, ${hospital_name}, ${police_station}, 'pending', 
+        ${username}, ${password}, ${full_name}, ${thai_id}, ${phone_number}, ${is_kyc_verified}, ${role_id}, ${email}, ${line_id}, ${line_user_id}, ${remark}, ${register_type}, ${addressid}, ${chwpart}, ${amppart}, ${tmbpart}, ${moopart}, ${police_station_id}, ${health_center_id}, 'pending', 
         NOW(), NOW()
       )
       ON CONFLICT (line_user_id) DO UPDATE SET
         username = EXCLUDED.username,
         password = EXCLUDED.password,
-        line_display_name = EXCLUDED.line_display_name,
+        full_name = EXCLUDED.full_name,
+        thai_id = EXCLUDED.thai_id,
+        phone_number = EXCLUDED.phone_number,
+        is_kyc_verified = EXCLUDED.is_kyc_verified,
+        role_id = EXCLUDED.role_id,
         email = EXCLUDED.email,
-        name = EXCLUDED.name,
-        department = EXCLUDED.department,
-        phone = EXCLUDED.phone,
-        id_card = EXCLUDED.id_card,
-        note = EXCLUDED.note,
-        subdistrict = EXCLUDED.subdistrict,
-        village = EXCLUDED.village,
-        hospital_name = EXCLUDED.hospital_name,
-        police_station = EXCLUDED.police_station,
+        line_id = EXCLUDED.line_id,
+        remark = EXCLUDED.remark,
+        register_type = EXCLUDED.register_type,
+        addressid = EXCLUDED.addressid,
+        chwpart = EXCLUDED.chwpart,
+        amppart = EXCLUDED.amppart,
+        tmbpart = EXCLUDED.tmbpart,
+        moopart = EXCLUDED.moopart,
+        police_station_id = EXCLUDED.police_station_id,
+        health_center_id = EXCLUDED.health_center_id,
         status = 'pending',
         updated_at = NOW();
     `;

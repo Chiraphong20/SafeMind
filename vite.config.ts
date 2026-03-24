@@ -6,6 +6,13 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
-    allowedHosts: true // ✅ อนุญาตทุก Host ทันที ไม่ต้องมานั่งกรอก URL เองครับ
+    allowedHosts: true, // ✅ อนุญาตทุก Host ทันที
+    proxy: {
+      '/api/fastapi': {
+        target: 'http://210.246.215.95:8000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/fastapi/, '')
+      }
+    }
   }
 })

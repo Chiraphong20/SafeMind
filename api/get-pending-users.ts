@@ -20,7 +20,7 @@ export default async function handler(req: any, res: any) {
 
     try {
         const { rows } = await sql`
-      SELECT line_user_id, name, department, phone, status 
+      SELECT line_user_id, full_name as name, role_id as department, phone_number as phone, status 
       FROM users 
       WHERE status = 'pending' 
       ORDER BY created_at DESC;

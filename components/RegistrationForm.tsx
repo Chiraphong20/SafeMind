@@ -114,8 +114,8 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
       const hc = healthCenters.find(h => h.id === formData.healthCenterId);
       const ps = policeStations.find(p => p.id === formData.policeStationId);
 
-      // 1. สร้าง Payload สำหรับส่งเข้า FastAPI (เพื่อให้โชว์ใน 8080/users)
-      const rawPayloadFastAPI = {
+      // 1. สร้าง Payload หลัก (ใช้โครงสร้างเดียวกับ FastAPI)
+      const rawPayload = {
         username: formData.username,
         password: formData.password,
         full_name: formData.fullName,
@@ -127,7 +127,7 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
         line_id: null,
         line_user_id: lineUserId || null,
         remark: formData.note || null,
-        register_type: 0,
+        register_type: 1,
         addressid: null,
         chwpart: isSubdistrictRole ? "นครราชสีมา" : null,
         amppart: isSubdistrictRole ? "ปากช่อง" : null,
@@ -137,40 +137,22 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
         health_center_id: formData.role === 'รพ.สต.' && formData.healthCenterId ? formData.healthCenterId : null
       };
 
-      // กรองค่า null และค่าว่าง (String ว่าง) ออกจาก JSON Object ทั้งหมด เพื่อป้องกัน FastAPI Error 500
-      const payloadFastAPI = Object.fromEntries(
-        Object.entries(rawPayloadFastAPI).filter(([, val]) => val !== null && val !== "")
+      // กรองค่า null และค่าว่าง (String ว่าง) ออกจาก JSON Object
+      const payload = Object.fromEntries(
+        Object.entries(rawPayload).filter(([, val]) => val !== null && val !== "")
       );
 
-      // 2. สร้าง Payload สำหรับส่งเข้า Vercel Postgres DB (เพื่อให้โชว์ใน Vercel AdminDashboard)
-      const payloadVercel = {
-        line_user_id: lineUserId || null,
-        line_display_name: displayName || null,
-        email: formData.email || email || null,
-        name: formData.fullName,
-        role: formData.role,
-        phone: formData.phone,
-        id_card: formData.idCard || null,
-        note: formData.note || null,
-        subdistrict: isSubdistrictRole ? formData.subdistrict : null,
-        village: isSubdistrictRole ? formData.village : null,
-        hospital_name: hc ? hc.hospital_name : null,
-        police_station: ps ? ps.station_name : null,
-        username: formData.username,
-        password: formData.password
-      };
-
-      // ยิงข้อมูลไปบันทึกทั้ง 2 ระบบพร้อมกัน
+      // ยิงข้อมูลไปบันทึกทั้ง 2 ระบบพร้อมกัน (ตอนนี้ฐานข้อมูลฝั่ง Vercel ก็เปลี่ยน Schema ให้ตรงกับ FastAPI แล้ว)
       const [resFastAPI, resVercel] = await Promise.all([
         fetch(FASTAPI_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify(payloadFastAPI)
+          body: JSON.stringify(payload)
         }),
         fetch(VERCEL_API_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify(payloadVercel)
+          body: JSON.stringify(payload)
         })
       ]);
 
