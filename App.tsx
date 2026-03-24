@@ -76,25 +76,30 @@ function App() {
       <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
 
 
-        <main className="py-8 px-4 max-w-5xl mx-auto">
-          <Routes>
-            {/* หน้าแรก / Register */}
-            <Route path="/" element={<RegistrationForm lineUserId={userId} />} />
-            <Route path="/register" element={<RegistrationForm lineUserId={userId} />} />
-            <Route path="/login" element={<RegistrationForm lineUserId={userId} />} />
+        <Routes>
+          {/* 👑 หน้า Admin (Approve) ให้ยึดเต็มจอ 100% ไม่มีขอบ */}
+          <Route path="/admin" element={<Approve />} />
 
-            {/* หน้า Admin */}
-            <Route path="/admin" element={<Approve />} />
+          {/* 📄 หน้าอื่นๆ ทั้งหมด ให้มี margins แบบเดิม (max-w-5xl) */}
+          <Route path="/*" element={
+            <main className="py-8 px-4 max-w-5xl mx-auto w-full">
+              <Routes>
+                {/* หน้าแรก / Register */}
+                <Route path="/" element={<RegistrationForm lineUserId={userId} />} />
+                <Route path="/register" element={<RegistrationForm lineUserId={userId} />} />
+                <Route path="/login" element={<RegistrationForm lineUserId={userId} />} />
 
-            {/* หน้าอื่นๆ */}
-            <Route path="/smiv" element={<SmiVTable />} />
-            <Route path="/pin" element={<PlaceholderPage title="ปักหมุดเยี่ยมบ้าน" icon={MapPin} color="bg-green-50 text-green-700 border-green-200" />} />
-            <Route path="/save" element={<PlaceholderPage title="บันทึกข้อมูล" icon={FileText} color="bg-blue-50 text-blue-700 border-blue-200" />} />
-            <Route path="/check" element={<PlaceholderPage title="ตรวจสอบผู้ป่วย" icon={ShieldCheck} color="bg-green-50 text-green-700 border-green-200" />} />
-            <Route path="/calendar" element={<PlaceholderPage title="ตารางคลินิก" icon={Calendar} color="bg-blue-50 text-blue-700 border-blue-200" />} />
-            <Route path="/tele" element={<PlaceholderPage title="ส่งคำขอเทเล" icon={Video} color="bg-green-50 text-green-700 border-green-200" />} />
-          </Routes>
-        </main>
+                {/* หน้าอื่นๆ */}
+                <Route path="/smiv" element={<SmiVTable />} />
+                <Route path="/pin" element={<PlaceholderPage title="ปักหมุดเยี่ยมบ้าน" icon={MapPin} color="bg-green-50 text-green-700 border-green-200" />} />
+                <Route path="/save" element={<PlaceholderPage title="บันทึกข้อมูล" icon={FileText} color="bg-blue-50 text-blue-700 border-blue-200" />} />
+                <Route path="/check" element={<PlaceholderPage title="ตรวจสอบผู้ป่วย" icon={ShieldCheck} color="bg-green-50 text-green-700 border-green-200" />} />
+                <Route path="/calendar" element={<PlaceholderPage title="ตารางคลินิก" icon={Calendar} color="bg-blue-50 text-blue-700 border-blue-200" />} />
+                <Route path="/tele" element={<PlaceholderPage title="ส่งคำขอเทเล" icon={Video} color="bg-green-50 text-green-700 border-green-200" />} />
+              </Routes>
+            </main>
+          } />
+        </Routes>
 
 
       </div>

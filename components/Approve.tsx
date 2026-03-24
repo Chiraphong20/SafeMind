@@ -160,7 +160,7 @@ const Approve: React.FC = () => {
 
       {/* Main Content Area */}
       <main className="flex-1 w-full bg-slate-50 p-4 pt-24 md:p-10 overflow-y-auto">
-         <div className="max-w-7xl mx-auto w-full h-full">
+         <div className="w-full h-full">
             {activeTab === 'users' ? (
               <div className="animate-in fade-in duration-500 pb-24 h-full">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-8 gap-4">
