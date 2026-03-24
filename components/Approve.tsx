@@ -86,7 +86,7 @@ const Approve: React.FC<{ onSignOut?: () => void }> = ({ onSignOut }) => {
 
       if (response.ok) {
         alert("✅ อนุมัติเรียบร้อย!");
-        setUsers(prevUsers => prevUsers.filter(user => user.id !== userId));
+        await fetchUsers(); // refresh จาก server
       }
     } catch (error) {
       alert("เกิดข้อผิดพลาดในการอนุมัติ");
@@ -102,8 +102,7 @@ const Approve: React.FC<{ onSignOut?: () => void }> = ({ onSignOut }) => {
         body: JSON.stringify({ user_id: user.userId })
       });
       if (response.ok) {
-        alert('✅ ลบผู้ใช้เรียบร้อย!');
-        setUsers(prev => prev.filter(u => u.id !== user.id));
+        await fetchUsers(); // refresh จาก server อัตโนมัติ
       } else {
         const err = await response.json().catch(() => ({}));
         alert('เกิดข้อผิดพลาด: ' + (err.details || err.error || response.status));
