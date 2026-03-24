@@ -28,6 +28,7 @@ const Approve: React.FC<{ onSignOut?: () => void }> = ({ onSignOut }) => {
   // User List State
   const [users, setUsers] = useState<UserRegistration[]>([]);
   const [loading, setLoading] = useState(false);
+  const [approvingId, setApprovingId] = useState<string | null>(null); // track which user is being approved
   const [searchTerm, setSearchTerm] = useState('');
 
   const API_BASE_URL = "/api";
@@ -72,24 +73,28 @@ const Approve: React.FC<{ onSignOut?: () => void }> = ({ onSignOut }) => {
   }, []);
 
   const handleApprove = async (userId: string) => {
+    if (approvingId) return; // ป้องกันการกดซ้ำขณะที่กำลัง approve
     if (!window.confirm("ยืนยันการอนุมัติสมาชิก SafeMind ท่านนี้?")) return;
 
+    setApprovingId(userId);
     try {
       const response = await fetch(`${API_BASE_URL}/approve-user`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'ngrok-skip-browser-warning': 'true'
-        },
+        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
         body: JSON.stringify({ line_user_id: userId, user_id: users.find(u => u.id === userId)?.userId })
       });
 
       if (response.ok) {
-        alert("✅ อนุมัติเรียบร้อย!");
-        await fetchUsers(); // refresh จาก server
+        // Delay refresh so the list doesn’t re-render under the user’s cursor
+        await new Promise(r => setTimeout(r, 600));
+        await fetchUsers();
+      } else {
+        alert('เกิดข้อผิดพลาดในการอนุมัติ');
       }
     } catch (error) {
-      alert("เกิดข้อผิดพลาดในการอนุมัติ");
+      alert('เกิดข้อผิดพลาดในการอนุมัติ');
+    } finally {
+      setApprovingId(null);
     }
   };
 
@@ -267,20 +272,26 @@ const Approve: React.FC<{ onSignOut?: () => void }> = ({ onSignOut }) => {
                                 {user.status === UserStatus.PENDING && (
                                   <button
                                     onClick={() => handleApprove(user.id)}
-                                    className="bg-slate-900 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-teal-600 transition-all shadow-md hover:shadow-lg flex items-center gap-1.5"
+                                    disabled={!!approvingId}
+                                    className={`px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-md flex items-center gap-1.5 ${approvingId === user.id ? 'bg-teal-500 text-white cursor-wait' : approvingId ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-slate-900 text-white hover:bg-teal-600 hover:shadow-lg'}`}
                                   >
-                                    <UserCheck size={15} /> ยืนยัน
+                                    {approvingId === user.id
+                                      ? <><span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin inline-block" /> กำลังอนุมัติ...</>
+                                      : <><UserCheck size={15} /> ยืนยัน</>
+                                    }
                                   </button>
                                 )}
                                 <button
                                   onClick={() => handleDelete(user)}
-                                  className="bg-red-50 text-red-500 border border-red-200 px-3 py-2 rounded-xl text-sm font-bold hover:bg-red-500 hover:text-white transition-all flex items-center gap-1.5"
+                                  disabled={!!approvingId}
+                                  className="bg-red-50 text-red-500 border border-red-200 px-3 py-2 rounded-xl text-sm font-bold hover:bg-red-500 hover:text-white transition-all flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
                                   title="ลบผู้ใช้"
                                 >
                                   <Trash2 size={15} />
                                 </button>
                               </div>
                             </td>
+
                           </tr>
                         ))
                       )}
