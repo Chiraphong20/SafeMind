@@ -1,3 +1,5 @@
+import axios from 'axios';
+
 export default async function handler(req: any, res: any) {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -16,24 +18,17 @@ export default async function handler(req: any, res: any) {
     }
 
     try {
-        const response = await fetch("http://210.246.215.95:8000/register", {
-            method: "POST",
+        const response = await axios.post("http://210.246.215.95:8000/register", req.body, {
             headers: {
                 "Content-Type": "application/json",
-            },
-            body: JSON.stringify(req.body)
+            }
         });
-
-        const contentType = response.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-            const data = await response.json();
-            return res.status(response.status).json(data);
-        } else {
-            const text = await response.text();
-            return res.status(response.status).send(text);
-        }
+        
+        return res.status(response.status).json(response.data);
     } catch (error: any) {
-        console.error('Proxy Error:', error);
-        return res.status(500).json({ detail: [{ msg: error.message || "Proxy connection failed" }] });
+        console.error('Proxy Error:', error.message);
+        const status = error.response ? error.response.status : 500;
+        const data = error.response ? error.response.data : { detail: [{ msg: error.message || "Proxy connection failed" }] };
+        return res.status(status).json(data);
     }
 }
