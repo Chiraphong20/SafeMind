@@ -548,6 +548,31 @@ const SpotMap: React.FC = () => {
                 </select>
               </div>
             </div>
+
+            {/* Place layers */}
+            <div className="pt-2">
+              <p className="text-xs font-black text-slate-400 mb-3 tracking-widest uppercase flex items-center gap-1"><Layers size={11} /> Layer สถานที่สำคัญ</p>
+              <div className="space-y-1">
+                {Object.entries(TYPE_LABELS).map(([t, l]) => (
+                  <label key={t} className="flex items-center gap-3 py-1 px-2 hover:bg-slate-50 rounded-lg cursor-pointer transition-colors group">
+                    <div onClick={(e) => { e.preventDefault(); toggleLayer(t); }} className={`w-8 h-4 rounded-full transition-colors flex-shrink-0 relative ${activeLayers.has(t) ? 'bg-blue-500' : 'bg-slate-200 group-hover:bg-slate-300'}`}>
+                      <div className={`w-3 h-3 bg-white rounded-full shadow absolute top-0.5 transition-all ${activeLayers.has(t) ? 'left-4' : 'left-0.5'}`} />
+                    </div>
+                    <img src={TYPE_ICONS[t]} alt="" className="w-5 h-5 object-contain opacity-90 group-hover:opacity-100" />
+                    <span className="text-sm font-medium text-slate-600 group-hover:text-slate-800">{l}</span>
+                  </label>
+                ))}
+              </div>
+
+              {/* Heatmap toggle */}
+              <label className="flex items-center gap-3 py-1.5 px-2 hover:bg-slate-50 rounded-lg cursor-pointer mt-2 transition-colors group">
+                <div onClick={(e) => { e.preventDefault(); setShowHeatmap(!showHeatmap); }} className={`w-8 h-4 rounded-full transition-colors flex-shrink-0 relative ${showHeatmap ? 'bg-red-500' : 'bg-slate-200 group-hover:bg-slate-300'}`}>
+                  <div className={`w-3 h-3 bg-white rounded-full shadow absolute top-0.5 transition-all ${showHeatmap ? 'left-4' : 'left-0.5'}`} />
+                </div>
+                <span className="text-sm font-medium text-slate-600 group-hover:text-slate-800">🌡️ Hotspot Heatmap</span>
+              </label>
+            </div>
+
             {/* Placeholder to make bottom pad */}
             <div className="h-6"></div>
           </div>
@@ -569,6 +594,23 @@ const SpotMap: React.FC = () => {
           )}
           
           <div ref={mapRef} className="absolute inset-0 z-0" />
+
+          {/* Legend */}
+          <div className="absolute bottom-6 left-6 z-[400] bg-white/95 backdrop-blur-sm border border-slate-200 rounded-xl p-3 shadow-lg w-44">
+            <p className="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">สัญลักษณ์ผู้ป่วย</p>
+            {([
+              ['/y_r.png', '/x_r.png', 'สีแดง (วิกฤต)'],
+              ['/y_o.png', '/x_o.png', 'สีส้ม (เฝ้าระวังสูง)'],
+              ['/y_y.png', '/x_y.png', 'สีเหลือง (เฝ้าระวัง)'],
+              ['/y_g.png', '/x_g.png', 'สีเขียว (ปกติ)'],
+            ] as const).map(([m, f, label]) => (
+              <div key={label} className="flex items-center gap-2 mb-2 last:mb-0">
+                <img src={m} alt="" className="w-5 h-5 object-contain" title="ชาย" />
+                <img src={f} alt="" className="w-5 h-5 object-contain" title="หญิง" />
+                <span className="text-xs font-medium text-slate-600">{label}</span>
+              </div>
+            ))}
+          </div>
 
           {/* Floating Search Bar */}
           <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[400] w-full max-w-lg px-4 pointer-events-auto">
