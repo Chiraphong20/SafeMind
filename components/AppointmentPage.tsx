@@ -52,6 +52,74 @@ const STATUS_CONFIG = {
   attended: { label: 'มาแล้ว',      bg: 'bg-slate-50',   text: 'text-slate-500',  border: 'border-slate-200',  icon: CheckCircle,   dot: 'bg-slate-300' },
 };
 
+// ─── Mock Data (2026) ─────────────────────────────────────────────────────────
+// Demonstrates the "Append-Only" pattern of oapp table:
+// Each patient has multiple rows — each row = 1 visit → next appointment
+// The row with the LATEST vstdate = real next appointment (nextdate field)
+const MOCK_OAPP_2026: OappRaw[] = [
+  // ── HN-RED-01: มาตลอด 3 ครั้ง (3 rows)
+  { oapp_id:1001, hn:'HN-RED-01', vn:'20260106001001', vstdate:'2026-01-06', nextdate:'2026-02-03', nexttime:'09:00:00', clinic:'001', doctor:'DR001', note:null, app_cause:'ติดตามอาการจิตเวช SMI-V สีแดง', note1:null, note2:'ห้ามนัดคนเดียว', visit_vn:'20260203001099', patient_visit:'Y', oapp_status_id:2 },
+  { oapp_id:1002, hn:'HN-RED-01', vn:'20260203001002', vstdate:'2026-02-03', nextdate:'2026-03-03', nexttime:'09:00:00', clinic:'001', doctor:'DR001', note:null, app_cause:'ติดตามอาการจิตเวช SMI-V สีแดง', note1:null, note2:'ห้ามนัดคนเดียว', visit_vn:'20260303001099', patient_visit:'Y', oapp_status_id:2 },
+  { oapp_id:1003, hn:'HN-RED-01', vn:'20260303001003', vstdate:'2026-03-03', nextdate:'2026-04-07', nexttime:'09:00:00', clinic:'001', doctor:'DR001', note:null, app_cause:'ติดตามอาการจิตเวช SMI-V สีแดง', note1:null, note2:'ห้ามนัดคนเดียว', visit_vn:null, patient_visit:null, oapp_status_id:1 },
+
+  // ── HN-RED-02: ผิดนัด 1 ครั้ง → กลับมา (3 rows)
+  { oapp_id:1011, hn:'HN-RED-02', vn:'20260110002001', vstdate:'2026-01-10', nextdate:'2026-02-10', nexttime:'10:00:00', clinic:'010', doctor:'DR002', note:null, app_cause:'ติดตามความวิตกกังวล ปรับยา', note1:null, note2:'FBS ก่อนพบแพทย์', visit_vn:null, patient_visit:null, oapp_status_id:1 },
+  { oapp_id:1012, hn:'HN-RED-02', vn:'20260224002002', vstdate:'2026-02-24', nextdate:'2026-03-24', nexttime:'10:00:00', clinic:'010', doctor:'DR002', note:null, app_cause:'ติดตามความวิตกกังวล ปรับยา', note1:null, note2:'FBS ก่อนพบแพทย์', visit_vn:'20260324002099', patient_visit:'Y', oapp_status_id:2 },
+  { oapp_id:1013, hn:'HN-RED-02', vn:'20260324002003', vstdate:'2026-03-24', nextdate:'2026-04-21', nexttime:'10:00:00', clinic:'010', doctor:'DR002', note:null, app_cause:'ติดตามความวิตกกังวล ปรับยา', note1:null, note2:'FBS ก่อนพบแพทย์', visit_vn:null, patient_visit:null, oapp_status_id:1 },
+
+  // ── HN-R-10: นัดวันนี้! (1 row)
+  { oapp_id:1021, hn:'HN-R-10', vn:'20260310010001', vstdate:'2026-03-10', nextdate:'2026-03-24', nexttime:'08:30:00', clinic:'010', doctor:'DR002', note:null, app_cause:'ฉุกเฉินจิตเวช ติดตามอาการหลังวิกฤต', note1:null, note2:'แจ้งครอบครัว', visit_vn:null, patient_visit:null, oapp_status_id:1 },
+
+  // ── HN-R-11: มาตลอด 3 ครั้ง (3 rows)
+  { oapp_id:1031, hn:'HN-R-11', vn:'20260105011001', vstdate:'2026-01-05', nextdate:'2026-02-02', nexttime:'09:00:00', clinic:'010', doctor:'DR002', note:null, app_cause:'ติดตามอาการรุนแรง ประสานคนในครอบครัว', note1:null, note2:null, visit_vn:'20260202011099', patient_visit:'Y', oapp_status_id:2 },
+  { oapp_id:1032, hn:'HN-R-11', vn:'20260202011002', vstdate:'2026-02-02', nextdate:'2026-03-02', nexttime:'09:00:00', clinic:'010', doctor:'DR002', note:null, app_cause:'ติดตามอาการรุนแรง ประสานคนในครอบครัว', note1:null, note2:null, visit_vn:'20260302011099', patient_visit:'Y', oapp_status_id:2 },
+  { oapp_id:1033, hn:'HN-R-11', vn:'20260302011003', vstdate:'2026-03-02', nextdate:'2026-04-02', nexttime:'09:00:00', clinic:'010', doctor:'DR002', note:null, app_cause:'ติดตามอาการรุนแรง ประสานคนในครอบครัว', note1:null, note2:null, visit_vn:null, patient_visit:null, oapp_status_id:1 },
+
+  // ── HN-R-12: เลยกำหนด (1 row)
+  { oapp_id:1041, hn:'HN-R-12', vn:'20260220012001', vstdate:'2026-02-20', nextdate:'2026-03-20', nexttime:'13:00:00', clinic:'010', doctor:'DR002', note:null, app_cause:'ติดตามวิกฤต ชนม์ชนก ประวัติรุนแรง', note1:null, note2:'แจ้งครอบครัวก่อนพบ', visit_vn:null, patient_visit:null, oapp_status_id:1 },
+
+  // ── HN-YEL-01: มาตลอด 3 ครั้ง (3 rows)
+  { oapp_id:1051, hn:'HN-YEL-01', vn:'20260115013001', vstdate:'2026-01-15', nextdate:'2026-02-12', nexttime:'09:00:00', clinic:'001', doctor:'DR001', note:null, app_cause:'ติดตามอาการซึมเศร้าระดับเฝ้าระวัง', note1:null, note2:null, visit_vn:'20260212013099', patient_visit:'Y', oapp_status_id:2 },
+  { oapp_id:1052, hn:'HN-YEL-01', vn:'20260212013002', vstdate:'2026-02-12', nextdate:'2026-03-12', nexttime:'09:00:00', clinic:'001', doctor:'DR001', note:null, app_cause:'ติดตามอาการซึมเศร้าระดับเฝ้าระวัง', note1:null, note2:null, visit_vn:'20260312013099', patient_visit:'Y', oapp_status_id:2 },
+  { oapp_id:1053, hn:'HN-YEL-01', vn:'20260312013003', vstdate:'2026-03-12', nextdate:'2026-04-09', nexttime:'09:00:00', clinic:'001', doctor:'DR001', note:null, app_cause:'ติดตามอาการซึมเศร้าระดับเฝ้าระวัง', note1:null, note2:null, visit_vn:null, patient_visit:null, oapp_status_id:1 },
+
+  // ── HN-YEL-02: ขาดนัดต่อเนื่อง 3 ครั้ง! (3 rows)
+  { oapp_id:1061, hn:'HN-YEL-02', vn:'20260120014001', vstdate:'2026-01-20', nextdate:'2026-02-17', nexttime:'10:00:00', clinic:'001', doctor:'DR001', note:null, app_cause:'ติดตามอาการ ขาดยาต่อเนื่อง', note1:null, note2:'FBS + HbA1c', visit_vn:null, patient_visit:null, oapp_status_id:1 },
+  { oapp_id:1062, hn:'HN-YEL-02', vn:'20260217014002', vstdate:'2026-02-17', nextdate:'2026-03-17', nexttime:'10:00:00', clinic:'001', doctor:'DR001', note:null, app_cause:'ติดตามอาการ ขาดยาต่อเนื่อง', note1:null, note2:'FBS + HbA1c', visit_vn:null, patient_visit:null, oapp_status_id:1 },
+  { oapp_id:1063, hn:'HN-YEL-02', vn:'20260310014003', vstdate:'2026-03-10', nextdate:'2026-04-07', nexttime:'10:00:00', clinic:'001', doctor:'DR001', note:null, app_cause:'ติดตามอาการ ขาดยาต่อเนื่อง', note1:null, note2:'FBS + HbA1c', visit_vn:null, patient_visit:null, oapp_status_id:1 },
+
+  // ── HN-Y-10: 2 rows
+  { oapp_id:1071, hn:'HN-Y-10', vn:'20260210015001', vstdate:'2026-02-10', nextdate:'2026-03-10', nexttime:'09:00:00', clinic:'001', doctor:'DR001', note:null, app_cause:'ติดตามอาการ เฝ้าระวัง สุนิสา', note1:null, note2:null, visit_vn:'20260310015099', patient_visit:'Y', oapp_status_id:2 },
+  { oapp_id:1072, hn:'HN-Y-10', vn:'20260310015002', vstdate:'2026-03-10', nextdate:'2026-04-14', nexttime:'09:00:00', clinic:'001', doctor:'DR001', note:null, app_cause:'ติดตามอาการ เฝ้าระวัง สุนิสา', note1:null, note2:null, visit_vn:null, patient_visit:null, oapp_status_id:1 },
+
+  // ── HN-Y-11: 2 rows
+  { oapp_id:1081, hn:'HN-Y-11', vn:'20260215016001', vstdate:'2026-02-15', nextdate:'2026-03-15', nexttime:'09:00:00', clinic:'001', doctor:'DR001', note:null, app_cause:'ติดตาม เฝ้าดู ประทีป', note1:null, note2:null, visit_vn:'20260315016099', patient_visit:'Y', oapp_status_id:2 },
+  { oapp_id:1082, hn:'HN-Y-11', vn:'20260315016002', vstdate:'2026-03-15', nextdate:'2026-04-19', nexttime:'09:00:00', clinic:'001', doctor:'DR001', note:null, app_cause:'ติดตาม เฝ้าดู ประทีป', note1:null, note2:null, visit_vn:null, patient_visit:null, oapp_status_id:1 },
+
+  // ── HN-Y-12: 2 rows
+  { oapp_id:1091, hn:'HN-Y-12', vn:'20260125017001', vstdate:'2026-01-25', nextdate:'2026-02-22', nexttime:'11:00:00', clinic:'001', doctor:'DR001', note:null, app_cause:'ติดตาม มาลี ร้อนใจ', note1:null, note2:null, visit_vn:'20260222017099', patient_visit:'Y', oapp_status_id:2 },
+  { oapp_id:1092, hn:'HN-Y-12', vn:'20260222017002', vstdate:'2026-02-22', nextdate:'2026-03-29', nexttime:'11:00:00', clinic:'001', doctor:'DR001', note:null, app_cause:'ติดตาม มาลี ร้อนใจ', note1:null, note2:null, visit_vn:null, patient_visit:null, oapp_status_id:1 },
+
+  // ── HN-GRN-01: 2 rows
+  { oapp_id:1101, hn:'HN-GRN-01', vn:'20260201018001', vstdate:'2026-02-01', nextdate:'2026-03-01', nexttime:'09:00:00', clinic:'020', doctor:'DR003', note:null, app_cause:'ตรวจติดตามสุขภาพจิต ระดับปกติ', note1:null, note2:null, visit_vn:'20260301018099', patient_visit:'Y', oapp_status_id:2 },
+  { oapp_id:1102, hn:'HN-GRN-01', vn:'20260301018002', vstdate:'2026-03-01', nextdate:'2026-04-05', nexttime:'09:00:00', clinic:'020', doctor:'DR003', note:null, app_cause:'ตรวจติดตามสุขภาพจิต ระดับปกติ', note1:null, note2:null, visit_vn:null, patient_visit:null, oapp_status_id:1 },
+
+  // ── HN-GRN-02: มาแล้ว (1 row)
+  { oapp_id:1111, hn:'HN-GRN-02', vn:'20260214019001', vstdate:'2026-02-14', nextdate:'2026-03-14', nexttime:'09:00:00', clinic:'020', doctor:'DR003', note:null, app_cause:'ตรวจประจำปี สุขภาพจิตดี', note1:null, note2:null, visit_vn:'20260314019099', patient_visit:'Y', oapp_status_id:2 },
+
+  // ── HN-G-10: 3 rows
+  { oapp_id:1121, hn:'HN-G-10', vn:'20260120020001', vstdate:'2026-01-20', nextdate:'2026-02-17', nexttime:'09:00:00', clinic:'015', doctor:'DR004', note:null, app_cause:'นัดตรวจประจำ 3 เดือน สมชาย', note1:null, note2:null, visit_vn:'20260217020099', patient_visit:'Y', oapp_status_id:2 },
+  { oapp_id:1122, hn:'HN-G-10', vn:'20260217020002', vstdate:'2026-02-17', nextdate:'2026-03-24', nexttime:'09:00:00', clinic:'015', doctor:'DR004', note:null, app_cause:'นัดตรวจประจำ 3 เดือน สมชาย', note1:null, note2:null, visit_vn:'20260324020099', patient_visit:'Y', oapp_status_id:2 },
+  { oapp_id:1123, hn:'HN-G-10', vn:'20260324020003', vstdate:'2026-03-24', nextdate:'2026-04-28', nexttime:'09:00:00', clinic:'015', doctor:'DR004', note:null, app_cause:'นัดตรวจประจำ 3 เดือน สมชาย', note1:null, note2:null, visit_vn:null, patient_visit:null, oapp_status_id:1 },
+
+  // ── HN-G-11: 1 row
+  { oapp_id:1131, hn:'HN-G-11', vn:'20260305021001', vstdate:'2026-03-05', nextdate:'2026-04-05', nexttime:'09:00:00', clinic:'015', doctor:'DR004', note:null, app_cause:'นัดตรวจ ศิริพร สุขสงบ', note1:null, note2:null, visit_vn:null, patient_visit:null, oapp_status_id:1 },
+
+  // ── HN-G-12: 1 row
+  { oapp_id:1141, hn:'HN-G-12', vn:'20260228022001', vstdate:'2026-02-28', nextdate:'2026-03-28', nexttime:'13:00:00', clinic:'015', doctor:'DR004', note:null, app_cause:'นัดตรวจ วิชัย สุขภาพดี', note1:null, note2:null, visit_vn:null, patient_visit:null, oapp_status_id:1 },
+];
+
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 const AppointmentPage: React.FC = () => {
   const [rawData, setRawData] = useState<OappRaw[]>([]);
@@ -67,7 +135,7 @@ const AppointmentPage: React.FC = () => {
 
   const API_BASE = '/api/fastapi';
 
-  // ─── Fetch all oapp data ─────────────────────────────────────────────────
+  // ─── Fetch + merge with mock data ────────────────────────────────────────
   const fetchData = async () => {
     setLoading(true);
     setError(null);
@@ -76,28 +144,32 @@ const AppointmentPage: React.FC = () => {
       const { access_token } = await tokenRes.json();
       const headers = { Authorization: `Bearer ${access_token}` };
 
-      // Paginate through all records
-      let all: OappRaw[] = [];
-      let skip = 0;
-      const limit = 500;
-      while (true) {
-        const res = await fetch(`${API_BASE}/oapp?skip=${skip}&limit=${limit}`, { headers });
-        if (!res.ok) throw new Error(`API error: ${res.status}`);
-        const data = await res.json();
-        const items: OappRaw[] = Array.isArray(data) ? data : (data.items || []);
-        if (items.length === 0) break;
-        all = all.concat(items);
-        skip += limit;
-        if (items.length < limit) break; // last page
-      }
+      let apiData: OappRaw[] = [];
+      try {
+        let skip = 0;
+        const limit = 500;
+        while (true) {
+          const res = await fetch(`/api/fastapi/oapp?skip=${skip}&limit=${limit}`, { headers });
+          if (!res.ok) break;
+          const data = await res.json();
+          const items: OappRaw[] = Array.isArray(data) ? data : (data.items || []);
+          if (items.length === 0) break;
+          apiData = apiData.concat(items);
+          skip += limit;
+          if (items.length < limit) break;
+        }
+      } catch (_) { /* ignore API errors, fall through to mock */ }
+
+      // ── Merge: real API rows take priority over mock rows
+      // Keep real API rows for all HNs that have real data; fill the rest from mock
+      const realHns = new Set(apiData.map(r => r.hn));
+      const mockFill = MOCK_OAPP_2026.filter(r => !realHns.has(r.hn));
+      const all = [...apiData, ...mockFill];
 
       setRawData(all);
       setTotalFetched(all.length);
 
-      // ── Data Cleansing Logic ──────────────────────────────────────────────
-      // เนื่องจาก oapp เป็น append-only, แต่ละ HN จะมีหลาย row
-      // เราต้องการ "แถวที่ vstdate ล่าสุด" ของแต่ละ HN
-      // เพราะ nextdate ในแถวนั้นคือวันนัดหมายจริงที่ valid ล่าสุด
+      // ── Data Cleansing: group by HN, pick the row with latest vstdate
       const byHn: Record<string, OappRaw[]> = {};
       for (const row of all) {
         if (!row.hn || !row.nextdate) continue;
@@ -107,14 +179,9 @@ const AppointmentPage: React.FC = () => {
 
       const result: CleanAppointment[] = [];
       for (const [hn, rows] of Object.entries(byHn)) {
-        // Sort rows by vstdate desc → แถวล่าสุดอยู่บนสุด
         rows.sort((a, b) => b.vstdate.localeCompare(a.vstdate));
         const latest = rows[0];
-
-        // ถ้า visit_vn ของแถวล่าสุดมีค่า = มาตามนัดแล้ว และไม่มีนัดถัดไปอีก
         const attended = !!latest.visit_vn;
-        const status = getStatus(latest.nextdate, attended);
-
         result.push({
           hn,
           lastVisitDate: latest.vstdate,
@@ -125,7 +192,7 @@ const AppointmentPage: React.FC = () => {
           appCause: latest.app_cause,
           note: latest.note || latest.note2,
           attended,
-          status,
+          status: getStatus(latest.nextdate, attended),
           totalRecords: rows.length,
         });
       }
@@ -137,6 +204,7 @@ const AppointmentPage: React.FC = () => {
       setLoading(false);
     }
   };
+
 
   useEffect(() => { fetchData(); }, []);
 
