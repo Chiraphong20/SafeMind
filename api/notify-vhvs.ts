@@ -1,11 +1,14 @@
-import { sql } from '@vercel/postgres';
 import axios from 'axios';
+
+const FASTAPI_BASE = "http://210.246.215.95:8000";
 
 interface PatientAlert {
   hn: string;
   pt_name: string;
   result: string;
   tmbpart?: string;
+  amppart?: string;
+  chwpart?: string;
 }
 
 export default async function handler(req: any, res: any) {
@@ -61,15 +64,21 @@ export default async function handler(req: any, res: any) {
     // 2. Process each regional bucket and notify matched VHVs
     for (const [tmbpart, localPatients] of Object.entries(areaBuckets)) {
       
-        // Fetch approved VHVs (role_id = 1) in this exact subdistrict
-        const { rows: vhvs } = await sql`
-            SELECT line_user_id, full_name, tmbpart 
-            FROM users 
-            WHERE role_id = '1' 
-            AND status = 'APPROVED' 
-            AND tmbpart = ${tmbpart}
-            AND line_user_id IS NOT NULL;
-        `;
+        // Fetch approved VHVs (role_id = 5 = อสม.) in this exact subdistrict via FastAPI
+        // Step 1: Get a machine token
+        const tokenRes = await axios.post(`${FASTAPI_BASE}/token`,
+            new URLSearchParams({ username: "admin99", password: "admin99" }),
+            { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+        );
+        const machineToken = tokenRes.data.access_token;
+        const apiHeaders = { 'Authorization': `Bearer ${machineToken}` };
+
+        // Step 2: Query users who are อสม. (role_id=5), active, and have the same tmbpart
+        const usersRes = await axios.get(`${FASTAPI_BASE}/users`, {
+            headers: apiHeaders,
+            params: { role_id: 5, is_active: true, tmbpart, limit: 100 }
+        });
+        const vhvs = (usersRes.data.items || []).filter((u: any) => u.line_user_id);
 
         if (vhvs.length === 0) {
             console.log(`No VHVs found for subdistrict ${tmbpart}. Skipping ${localPatients.length} patients.`);
