@@ -148,8 +148,34 @@ const SpotMap: React.FC = () => {
   const [selectedTmb, setSelectedTmb] = useState<string>('');
   const [selectedMoo, setSelectedMoo] = useState<string>('');
   const [tmbNames, setTmbNames] = useState<Record<string, string>>({}); // tmbpart code → Thai name
+  const [allTambons, setAllTambons] = useState<string[]>([]); // all Pak Chong tambons
 
   const API_BASE_URL = '/api/fastapi';
+
+  // ─── Load ALL Pak Chong tambons on mount ──────────────────────────────
+  useEffect(() => {
+    const loadAllTambons = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/thaiaddress?chwpart=30&amppart=21&limit=100`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const items = data.items || [];
+        // Filter only tambon level (codetype=3) and sort
+        const tambons = items
+          .filter((i: any) => i.codetype === '3' && i.tmbpart && i.tmbpart !== '00')
+          .sort((a: any, b: any) => a.tmbpart.localeCompare(b.tmbpart));
+        
+        setAllTambons(tambons.map((t: any) => t.tmbpart));
+        // Build name map
+        const names: Record<string, string> = {};
+        tambons.forEach((t: any) => { if (t.name) names[t.tmbpart] = `ต.${t.name}`; });
+        setTmbNames(prev => ({ ...prev, ...names }));
+      } catch (e) {
+        console.error('Failed to load tambons:', e);
+      }
+    };
+    loadAllTambons();
+  }, []);
 
   // ─── Fetch patient SMI-V data ──────────────────────────────────────────
   useEffect(() => {
@@ -341,13 +367,9 @@ const SpotMap: React.FC = () => {
     (!selectedMoo || p.moopart === selectedMoo)
   );
 
-  // Dynamic area option lists
-  const tmbOptions = Array.from(new Set(patients.map(p => p.tmbpart).filter(Boolean))).sort() as string[];
-  const mooOptions = Array.from(new Set(
-    patients
-      .filter(p => !selectedTmb || p.tmbpart === selectedTmb)
-      .map(p => p.moopart).filter(Boolean)
-  )).sort() as string[];
+  // All tambons and static moo range
+  const tmbOptions = allTambons.length > 0 ? allTambons : Array.from(new Set(patients.map(p => p.tmbpart).filter(Boolean))).sort() as string[];
+  const mooOptions = Array.from({ length: 20 }, (_, i) => String(i + 1).padStart(2, '0')); // '01' to '20'
 
   return (
     <div className="flex h-full overflow-hidden rounded-xl shadow-sm border border-slate-200 bg-white" style={{ minHeight: '600px' }}>
