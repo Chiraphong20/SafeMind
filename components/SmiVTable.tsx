@@ -67,15 +67,20 @@ const SmiVTable: React.FC = () => {
 
   // ใช้ Proxy Route ที่เราเซ็ตไว้ใน vercel.json และ vite.config.ts เพื่อแก้ปัญหา Mixed Content (HTTP -> HTTPS)
   const API_BASE_URL = "/api/fastapi";
-  // ข้อควรระวัง: ในการโปรดักชั่น ควรเก็บ Token ไว้ที่ฝั่ง Backend / API Route ของ Next.js
-  const token = process.env.NEXT_PUBLIC_API_TOKEN || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbjk5IiwiaWF0IjoxNzc0MjM3NDQ4LCJleHAiOjE3NzQyMzkyNDh9.4RpktWIcm_ROcXV3TM8RoncIEYnwyMLjMkfUq1ZoQ64";
 
   useEffect(() => {
     const fetchAndMapData = async () => {
       setLoading(true);
       try {
+        // 0. ดึง Token แบบอัตโนมัติจาก Vercel Serverless Function ป้องกัน Token หมดอายุ 
+        // และป้องกันไม่ให้ใครเห็นรหัส admin99 บนหน้า Frontend
+        const tokenRes = await fetch('/api/get-machine-token');
+        if (!tokenRes.ok) throw new Error("พังตั้งแต่ตอนดึง Token");
+        const tokenData = await tokenRes.json();
+        const freshToken = tokenData.access_token;
+
         const headers = {
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${freshToken}`,
           'Content-Type': 'application/json'
         };
 
@@ -124,7 +129,7 @@ const SmiVTable: React.FC = () => {
     };
 
     fetchAndMapData();
-  }, [token]);
+  }, []);
 
   return (
     <div className="p-6 bg-white rounded-xl shadow-sm border border-slate-200">
