@@ -321,7 +321,7 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
           {/* Regular fields */}
           <div className="relative">
             <MessageCircle className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
-            <input type="text" placeholder="LINE ID (ไม่บังคับ)" className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition"
+            <input type="text" placeholder="LINE ID *" required className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 transition"
               onChange={e => setFormData({ ...formData, lineId: e.target.value })} />
           </div>
 
