@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import liff from '@line/liff';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import RegistrationForm from './components/RegistrationForm';
-import AdminDashboard from './components/AdminDashboard';
+import Approve from './components/Approve';
 import SmiVTable from './components/SmiVTable';
 import { LayoutDashboard, UserPlus, ShieldCheck, MapPin, FileText, Calendar, Video, Loader2 } from 'lucide-react';
 
@@ -84,7 +84,7 @@ function App() {
             <Route path="/login" element={<RegistrationForm lineUserId={userId} />} />
 
             {/* หน้า Admin */}
-            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin" element={<Approve />} />
 
             {/* หน้าอื่นๆ */}
             <Route path="/smiv" element={<SmiVTable />} />
