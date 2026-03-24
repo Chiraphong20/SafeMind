@@ -3,6 +3,7 @@ import liff from '@line/liff';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import RegistrationForm from './components/RegistrationForm';
 import Approve from './components/Approve';
+import AdminLogin from './components/AdminLogin';
 import SmiVTable from './components/SmiVTable';
 import { LayoutDashboard, UserPlus, ShieldCheck, MapPin, FileText, Calendar, Video, Loader2 } from 'lucide-react';
 
@@ -24,9 +25,11 @@ const PlaceholderPage = ({ title, icon: Icon, color }: any) => (
 
 function App() {
   const [userId, setUserId] = useState<string>('');
-
-  // ✅ เพิ่ม state: loading (เริ่มต้นเป็น true เสมอ เพื่อบังหน้าจอไว้ก่อน)
   const [loading, setLoading] = useState<boolean>(true);
+  // Admin auth gate — seed from sessionStorage so refresh doesn't log out
+  const [isAdminAuthed, setIsAdminAuthed] = useState<boolean>(
+    () => !!sessionStorage.getItem('admin_token')
+  );
 
   useEffect(() => {
     if (window.location.pathname.startsWith('/admin')) {
@@ -77,8 +80,12 @@ function App() {
 
 
         <Routes>
-          {/* 👑 หน้า Admin (Approve) ให้ยึดเต็มจอ 100% ไม่มีขอบ */}
-          <Route path="/admin" element={<Approve />} />
+          {/* 👑 Admin route — protected by login gate */}
+          <Route path="/admin" element={
+            isAdminAuthed
+              ? <Approve onSignOut={() => { sessionStorage.removeItem('admin_token'); sessionStorage.removeItem('admin_user'); setIsAdminAuthed(false); }} />
+              : <AdminLogin onSuccess={() => setIsAdminAuthed(true)} />
+          } />
 
           {/* 📄 หน้าอื่นๆ ทั้งหมด ให้มี margins แบบเดิม (max-w-5xl) */}
           <Route path="/*" element={

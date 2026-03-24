@@ -18,7 +18,8 @@ export interface UserRegistration {
   timestamp: number;
 }
 
-const Approve: React.FC = () => {
+const Approve: React.FC<{ onSignOut?: () => void }> = ({ onSignOut }) => {
+  const adminName = sessionStorage.getItem('admin_user') || 'Admin';
   // Layout State
   const [activeTab, setActiveTab] = useState<'users' | 'smiv' | 'spotmap'>('users');
 
@@ -150,8 +151,14 @@ const Approve: React.FC = () => {
 
         {/* Footer actions */}
         <div className="w-full px-4 mt-auto">
-            <div className="w-full border-t border-slate-100 mb-4"></div>
-            <button className="w-full flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl font-bold transition-all duration-200">
+            <div className="w-full border-t border-slate-100 mb-3"></div>
+            <div className="px-4 py-2 mb-2">
+              <p className="text-xs font-bold text-slate-700 truncate">{adminName}</p>
+              <p className="text-xs text-slate-400">ผู้ดูแลระบบ</p>
+            </div>
+            <button
+              onClick={onSignOut}
+              className="w-full flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl font-bold transition-all duration-200">
                 <LogOut size={20} />
                 ออกจากระบบ
             </button>
