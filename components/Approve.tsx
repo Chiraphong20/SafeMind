@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserCheck, RefreshCw, ShieldCheck, Phone, Building2, Users, TableProperties, LogOut, Map } from 'lucide-react';
+import { UserCheck, RefreshCw, ShieldCheck, Phone, Building2, Users, TableProperties, LogOut, Map, Trash2 } from 'lucide-react';
 import SmiVTable from './SmiVTable';
 import SpotMap from './SpotMap';
 
@@ -90,6 +90,26 @@ const Approve: React.FC<{ onSignOut?: () => void }> = ({ onSignOut }) => {
       }
     } catch (error) {
       alert("เกิดข้อผิดพลาดในการอนุมัติ");
+    }
+  };
+
+  const handleDelete = async (user: UserRegistration) => {
+    if (!window.confirm(`ยืนยันลบผู้ใช้ "${user.fullName}" ออกจากระบบ? ไม่สามารถย้อนคืนได้`)) return;
+    try {
+      const response = await fetch(`${API_BASE_URL}/delete-user`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: user.userId })
+      });
+      if (response.ok) {
+        alert('✅ ลบผู้ใช้เรียบร้อย!');
+        setUsers(prev => prev.filter(u => u.id !== user.id));
+      } else {
+        const err = await response.json().catch(() => ({}));
+        alert('เกิดข้อผิดพลาด: ' + (err.details || err.error || response.status));
+      }
+    } catch (error) {
+      alert('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
     }
   };
 
@@ -244,14 +264,23 @@ const Approve: React.FC<{ onSignOut?: () => void }> = ({ onSignOut }) => {
                               </span>
                             </td>
                             <td className="p-4 text-right">
-                              {user.status === UserStatus.PENDING && (
+                              <div className="flex items-center gap-2 justify-end">
+                                {user.status === UserStatus.PENDING && (
+                                  <button
+                                    onClick={() => handleApprove(user.id)}
+                                    className="bg-slate-900 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-teal-600 transition-all shadow-md hover:shadow-lg flex items-center gap-1.5"
+                                  >
+                                    <UserCheck size={15} /> ยืนยัน
+                                  </button>
+                                )}
                                 <button
-                                  onClick={() => handleApprove(user.id)}
-                                  className="bg-slate-900 text-white px-5 py-2 rounded-xl text-sm font-bold hover:bg-teal-600 transition-all shadow-md hover:shadow-lg flex items-center gap-2 ml-auto"
+                                  onClick={() => handleDelete(user)}
+                                  className="bg-red-50 text-red-500 border border-red-200 px-3 py-2 rounded-xl text-sm font-bold hover:bg-red-500 hover:text-white transition-all flex items-center gap-1.5"
+                                  title="ลบผู้ใช้"
                                 >
-                                  <UserCheck size={16} /> ยืนยัน
+                                  <Trash2 size={15} />
                                 </button>
-                              )}
+                              </div>
                             </td>
                           </tr>
                         ))
