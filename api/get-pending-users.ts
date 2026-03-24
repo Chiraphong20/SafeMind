@@ -1,33 +1,47 @@
-import { sql } from '@vercel/postgres';
+import axios from 'axios';
+
+const FASTAPI = "http://210.246.215.95:8000";
 
 export default async function handler(req: any, res: any) {
-    // CORS Headers
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-    res.setHeader(
-        'Access-Control-Allow-Headers',
-        'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, ngrok-skip-browser-warning'
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'GET') return res.status(405).end();
+
+  try {
+    // Get machine token using admin99 credentials
+    const tokenRes = await axios.post(`${FASTAPI}/token`,
+      new URLSearchParams({ username: 'admin99', password: 'Baily1234' }),
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
     );
+    const token = tokenRes.data.access_token;
 
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
-    }
+    // Fetch all users from FastAPI
+    const usersRes = await axios.get(`${FASTAPI}/users?limit=200`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
 
-    if (req.method !== 'GET') {
-        return res.status(405).json({ message: 'Method Not Allowed' });
-    }
+    const allUsers: any[] = Array.isArray(usersRes.data) ? usersRes.data : (usersRes.data.items || []);
 
-    try {
-        const { rows } = await sql`
-      SELECT line_user_id, full_name as name, role_id as department, phone_number as phone, status 
-      FROM users 
-      WHERE status = 'pending' 
-      ORDER BY created_at DESC;
-    `;
-        return res.status(200).json(rows);
-    } catch (error: any) {
-        console.error('Fetch Error:', error);
-        return res.status(500).json({ error: 'Internal Server Error', details: error.message });
-    }
+    // Filter users who are inactive (pending approval), role 3-6 (non-admin)
+    const pending = allUsers
+      .filter(u => !u.is_active && u.role_id >= 3)
+      .map(u => ({
+        line_user_id: u.line_user_id,
+        user_id: u.user_id,
+        name: u.full_name || u.username,
+        phone: u.phone_number || '-',
+        department: u.role_name || `Role ${u.role_id}`,
+        role_id: u.role_id,
+        address: u.address_full_name || u.address_name || '-',
+        status: 'pending',
+        created_date: u.created_date,
+      }));
+
+    return res.status(200).json(pending);
+  } catch (err: any) {
+    console.error('get-pending-users error:', err.response?.data || err.message);
+    return res.status(500).json({ error: 'Internal Server Error', details: err.message });
+  }
 }

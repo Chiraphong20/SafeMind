@@ -1,59 +1,65 @@
-import { sql } from '@vercel/postgres';
 import axios from 'axios';
 
+const FASTAPI = "http://210.246.215.95:8000";
+
 export default async function handler(req: any, res: any) {
-    // CORS Headers
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-    res.setHeader(
-        'Access-Control-Allow-Headers',
-        'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, ngrok-skip-browser-warning'
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).end();
+
+  const { line_user_id, user_id } = req.body;
+  if (!line_user_id && !user_id) {
+    return res.status(400).json({ message: 'Missing line_user_id or user_id' });
+  }
+
+  try {
+    // 1. Get machine token
+    const tokenRes = await axios.post(`${FASTAPI}/token`,
+      new URLSearchParams({ username: 'admin99', password: 'Baily1234' }),
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+    );
+    const token = tokenRes.data.access_token;
+    const headers = { Authorization: `Bearer ${token}` };
+
+    // 2. If we only have line_user_id, find user_id first
+    let targetUserId = user_id;
+    let targetLineUserId = line_user_id;
+
+    if (!targetUserId && line_user_id) {
+      const usersRes = await axios.get(`${FASTAPI}/users?limit=500`, { headers });
+      const allUsers: any[] = Array.isArray(usersRes.data) ? usersRes.data : (usersRes.data.items || []);
+      const found = allUsers.find(u => u.line_user_id === line_user_id);
+      if (!found) return res.status(404).json({ error: 'User not found' });
+      targetUserId = found.user_id;
+      targetLineUserId = found.line_user_id;
+    }
+
+    // 3. Patch is_active = true via FastAPI
+    await axios.patch(`${FASTAPI}/users/${targetUserId}`,
+      { is_active: true },
+      { headers: { ...headers, 'Content-Type': 'application/json' } }
     );
 
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
+    // 4. Update LINE Rich Menu (best-effort)
+    const lineToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+    if (lineToken && targetLineUserId) {
+      const richMenuId = 'richmenu-794d774ad8ceb72a578744bc6174616c';
+      try {
+        await axios.post(
+          `https://api.line.me/v2/bot/user/${targetLineUserId}/richmenu/${richMenuId}`,
+          {},
+          { headers: { Authorization: `Bearer ${lineToken}` } }
+        );
+      } catch (lineErr: any) {
+        console.warn('LINE rich menu update failed:', lineErr.response?.data || lineErr.message);
+      }
     }
 
-    if (req.method !== 'POST') {
-        return res.status(405).json({ message: 'Method Not Allowed' });
-    }
-
-    const { line_user_id } = req.body;
-
-    if (!line_user_id) {
-        return res.status(400).json({ message: 'Missing line_user_id' });
-    }
-
-    try {
-        // 1. Update DB Status
-        await sql`
-      UPDATE users
-      SET status = 'approved', updated_at = NOW()
-      WHERE line_user_id = ${line_user_id};
-    `;
-
-        // 2. Change LINE Rich Menu
-        const lineToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
-        if (lineToken) {
-            // The Rich Menu ID for Richsafemind (6-grid)
-            const richMenuId = 'richmenu-794d774ad8ceb72a578744bc6174616c';
-            await axios.post(
-                `https://api.line.me/v2/bot/user/${line_user_id}/richmenu/${richMenuId}`,
-                {},
-                {
-                    headers: {
-                        'Authorization': `Bearer ${lineToken}`
-                    }
-                }
-            );
-        } else {
-            console.warn('LINE_CHANNEL_ACCESS_TOKEN is not set. Skipping Rich Menu update.');
-        }
-
-        return res.status(200).json({ success: true, message: 'Approved!' });
-    } catch (error: any) {
-        console.error('Approve Error:', error?.response?.data || error.message);
-        return res.status(500).json({ error: 'Internal Server Error', details: error?.response?.data || error.message });
-    }
+    return res.status(200).json({ success: true, message: 'User approved!' });
+  } catch (err: any) {
+    console.error('approve-user error:', err.response?.data || err.message);
+    return res.status(500).json({ error: 'Internal Server Error', details: err.response?.data || err.message });
+  }
 }

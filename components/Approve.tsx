@@ -10,10 +10,12 @@ export enum UserStatus {
 }
 
 export interface UserRegistration {
-  id: string;
+  id: string;        // line_user_id
+  userId: number;    // FastAPI user_id
   fullName: string;
   phone: string;
   organization: string;
+  address: string;
   status: UserStatus;
   timestamp: number;
 }
@@ -45,12 +47,14 @@ const Approve: React.FC<{ onSignOut?: () => void }> = ({ onSignOut }) => {
 
       if (Array.isArray(rawData)) {
         const formattedData: UserRegistration[] = rawData.map((user: any) => ({
-          id: user.line_user_id,
-          fullName: user.name,
-          phone: user.phone,
-          organization: user.department,
-          status: user.status === 'approved' ? UserStatus.APPROVED : UserStatus.PENDING,
-          timestamp: Date.now()
+          id: user.line_user_id || '',
+          userId: user.user_id || 0,
+          fullName: user.name || user.full_name || '(ไม่ระบุ)',
+          phone: user.phone || '-',
+          organization: user.department || '-',
+          address: user.address || '-',
+          status: UserStatus.PENDING,
+          timestamp: new Date(user.created_date || Date.now()).getTime()
         }));
         setUsers(formattedData);
       } else {
@@ -77,7 +81,7 @@ const Approve: React.FC<{ onSignOut?: () => void }> = ({ onSignOut }) => {
           'Content-Type': 'application/json',
           'ngrok-skip-browser-warning': 'true'
         },
-        body: JSON.stringify({ line_user_id: userId })
+        body: JSON.stringify({ line_user_id: userId, user_id: users.find(u => u.id === userId)?.userId })
       });
 
       if (response.ok) {
