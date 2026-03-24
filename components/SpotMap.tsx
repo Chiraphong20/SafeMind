@@ -86,6 +86,8 @@ interface PatientMapItem {
   sex: string;
   tmbpart?: string;
   moopart?: string;
+  chwpart?: string;
+  amppart?: string;
   lat?: number;
   lng?: number;
   entry_date?: string | null;
@@ -145,6 +147,7 @@ const SpotMap: React.FC = () => {
   // Area filters
   const [selectedTmb, setSelectedTmb] = useState<string>('');
   const [selectedMoo, setSelectedMoo] = useState<string>('');
+  const [tmbNames, setTmbNames] = useState<Record<string, string>>({}); // tmbpart code → Thai name
 
   const API_BASE_URL = '/api/fastapi';
 
@@ -192,6 +195,8 @@ const SpotMap: React.FC = () => {
             sex: ptMap[item.hn].sex || '1',
             tmbpart: ptMap[item.hn].tmbpart,
             moopart: ptMap[item.hn].moopart,
+            chwpart: ptMap[item.hn].chwpart,
+            amppart: ptMap[item.hn].amppart,
             entry_date: item.entry_date,
           }));
 
@@ -202,6 +207,28 @@ const SpotMap: React.FC = () => {
           yellow: withCoords.filter(p => p.result === 'สีเหลือง').length,
           green: withCoords.filter(p => p.result === 'สีเขียว').length,
         });
+
+        // Resolve tmbpart codes to Thai names via thaiaddress API
+        const uniqueTmbs = Array.from(new Set(withCoords.map(p => p.tmbpart).filter(Boolean))) as string[];
+        const names: Record<string, string> = {};
+        await Promise.all(uniqueTmbs.map(async (tmb) => {
+          // Use first patient's chwpart+amppart to build addressId
+          const sample = withCoords.find(p => p.tmbpart === tmb);
+          if (!sample) return;
+          const chw = sample.chwpart || '30';
+          const amp = sample.amppart || '21';
+          const addressId = `${chw}${amp}${tmb}`;
+          try {
+            const r = await fetch(`${API_BASE_URL}/thaiaddress/${addressId}`, { headers });
+            if (r.ok) {
+              const d = await r.json();
+              // API returns object or array with items
+              const item = d.items ? d.items[0] : d;
+              if (item?.name) names[tmb] = `ต.${item.name}`;
+            }
+          } catch {}
+        }));
+        setTmbNames(names);
       } catch (e) { console.error('SpotMap error:', e); }
       finally { setLoading(false); }
     };
@@ -368,7 +395,7 @@ const SpotMap: React.FC = () => {
                 className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-400"
               >
                 <option value="">ทั้งหมด</option>
-                {tmbOptions.map(t => <option key={t} value={t}>ตำบล {t}</option>)}
+                {tmbOptions.map(t => <option key={t} value={t}>{tmbNames[t] || `ตำบล ${t}`}</option>)}
               </select>
             </div>
             <div>
