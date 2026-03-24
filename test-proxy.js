@@ -1,15 +1,26 @@
-import handler from './api/proxy-register.js'; // Wait, it's .ts... I need to compile or run with tsx.
-
-// Actually I'll just write a script that does exactly what the proxy does, 
-// using axios with a mocked req and res
 import axios from 'axios';
 
 async function test() {
     const payload = {
-        username: "testuser01",
+        username: "testuserOsm4",
         password: "pwd",
-        full_name: "Test User",
-        phone_number: "0812345678"
+        full_name: "Test User OSM",
+        phone_number: "0812345678",
+        thai_id: "1234567890123",
+        is_kyc_verified: "0",
+        role_id: 5,
+        email: "osm4@test.com",
+        line_id: null,
+        line_user_id: "UtestOSM4",
+        remark: null,
+        register_type: 0,
+        addressid: null,
+        chwpart: null,
+        amppart: null,
+        tmbpart: "กลางดง",
+        moopart: "หมู่ 1",
+        police_station_id: null,
+        health_center_id: null
     };
 
     try {
@@ -20,10 +31,7 @@ async function test() {
         });
         console.log("SUCCESS:", response.status, response.data);
     } catch (error) {
-        console.error("PROXY ERROR:", error.message);
-        if (error.response) {
-            console.error("DATA:", error.response.data);
-        }
+        console.error("ERROR STATUS:", error.response?.status);
     }
 }
 

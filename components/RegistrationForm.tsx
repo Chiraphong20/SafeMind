@@ -74,8 +74,8 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
 
-  // URL ของ FastAPI Backend ผ่าน Proxy ของ Vercel เพื่อแก้ปัญหา Mixed Content (HTTP/HTTPS)
-  const API_URL = "/api/proxy-register";
+  // URL เปลี่ยนกลับมาใช้ชอง Local Vercel Database เพื่อให้เชื่อมกับหน้า Admin
+  const API_URL = "/api/register";
 
   const getRoleId = (roleName: string) => {
     switch (roleName) {
@@ -110,27 +110,24 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
 
     try {
       const isSubdistrictRole = formData.role === 'ปกครอง' || formData.role === 'อสม.';
+      const hc = healthCenters.find(h => h.id === formData.healthCenterId);
+      const ps = policeStations.find(p => p.id === formData.policeStationId);
 
       const payload = {
-        username: formData.username,
-        password: formData.password,
-        full_name: formData.fullName,
-        thai_id: formData.idCard || null,
-        phone_number: formData.phone,
-        is_kyc_verified: "0",
-        role_id: getRoleId(formData.role),
-        email: formData.email || email || null,
-        line_id: null,
         line_user_id: lineUserId || null,
-        remark: formData.note || null,
-        register_type: 0,
-        addressid: null,
-        chwpart: isSubdistrictRole ? "นครราชสีมา" : null,
-        amppart: isSubdistrictRole ? "ปากช่อง" : null,
-        tmbpart: isSubdistrictRole ? formData.subdistrict : null,
-        moopart: isSubdistrictRole ? formData.village : null,
-        police_station_id: formData.role === 'ตำรวจ' && formData.policeStationId ? formData.policeStationId : null,
-        health_center_id: formData.role === 'รพ.สต.' && formData.healthCenterId ? formData.healthCenterId : null
+        line_display_name: displayName || null,
+        email: formData.email || email || null,
+        name: formData.fullName,
+        role: formData.role,
+        phone: formData.phone,
+        id_card: formData.idCard || null,
+        note: formData.note || null,
+        subdistrict: isSubdistrictRole ? formData.subdistrict : null,
+        village: isSubdistrictRole ? formData.village : null,
+        hospital_name: hc ? hc.hospital_name : null,
+        police_station: ps ? ps.station_name : null,
+        username: formData.username,
+        password: formData.password
       };
 
       const response = await fetch(API_URL, {
@@ -147,7 +144,9 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
       } else {
         const errorData = await response.json();
         console.error("API Error Response:", errorData);
-        throw new Error(errorData.detail?.[0]?.msg || "API Connection Failed");
+        // รองรับทั้ง Error จาก FastAPI (detail) และ Local Vercel API (message, error, details)
+        const errMsg = errorData.message || errorData.error || errorData.details || errorData.detail?.[0]?.msg || "API Connection Failed";
+        throw new Error(errMsg);
       }
     } catch (err: any) {
       console.error(err);

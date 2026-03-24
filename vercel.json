@@ -2,6 +2,10 @@
   "devCommand": "vite",
   "rewrites": [
     {
+      "source": "/api/fastapi/:path*",
+      "destination": "http://210.246.215.95:8000/:path*"
+    },
+    {
       "source": "/((?!api/|static/|@vite/|@react-refresh|node_modules/|src/|.*\\..*).*)",
       "destination": "/"
     }
