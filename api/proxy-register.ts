@@ -28,7 +28,7 @@ export default async function handler(req: any, res: any) {
     } catch (error: any) {
         console.error('Proxy Error:', error.message);
         const status = error.response ? error.response.status : 500;
-        const data = error.response ? error.response.data : { detail: [{ msg: error.message || "Proxy connection failed" }] };
-        return res.status(status).json(data);
+        const errObj = error.response ? error.response.data : { detail: [{ msg: "PROXY_FAIL: " + error.message }] };
+        return res.status(status).json(errObj);
     }
 }
