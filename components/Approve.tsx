@@ -276,36 +276,43 @@ const Approve: React.FC<{ onSignOut?: () => void }> = ({ onSignOut }) => {
                             </td>
                             <td className="p-4 text-right">
                               <div className="flex items-center gap-2 justify-end">
-                                {user.status === UserStatus.PENDING && (
-                                  <button
-                                    onClick={() => handleApprove(user.id)}
-                                    disabled={!!approvingId}
-                                    className={`px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-md flex items-center gap-1.5 ${approvingId === user.id ? 'bg-teal-500 text-white cursor-wait' : approvingId ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-slate-900 text-white hover:bg-teal-600 hover:shadow-lg'}`}
-                                  >
-                                    {approvingId === user.id
-                                      ? <><span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin inline-block" /> กำลังอนุมัติ...</>
-                                      : <><UserCheck size={15} /> ยืนยัน</>
-                                    }
+
+                                {/* While APPROVING this row */}
+                                {approvingId === user.id && (
+                                  <button disabled className="bg-teal-500 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-1.5 cursor-wait">
+                                    <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin inline-block" />
+                                    กำลังอนุมัติ...
                                   </button>
                                 )}
-                                <button
-                                  onClick={() => handleDelete(user)}
-                                  disabled={!!approvingId || !!rejectingId}
-                                  className={`px-3 py-2 rounded-xl text-sm font-bold border transition-all flex items-center gap-1.5
-                                    ${rejectingId === user.id
-                                      ? 'bg-red-100 text-red-400 border-red-200 cursor-wait'
-                                      : approvingId || rejectingId
-                                      ? 'bg-slate-100 text-slate-300 border-slate-200 cursor-not-allowed'
-                                      : 'bg-red-50 text-red-500 border-red-200 hover:bg-red-500 hover:text-white'
-                                    }`}
-                                >
-                                  {rejectingId === user.id
-                                    ? <span className="w-3.5 h-3.5 border-2 border-red-300 border-t-red-600 rounded-full animate-spin inline-block" />
-                                    : <Trash2 size={14} />}
-                                  ยกเลิกคำขอ
-                                </button>
+
+                                {/* While REJECTING this row */}
+                                {rejectingId === user.id && (
+                                  <button disabled className="bg-red-400 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-1.5 cursor-wait">
+                                    <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin inline-block" />
+                                    กำลังยกเลิก...
+                                  </button>
+                                )}
+
+                                {/* Idle — no action in progress for this row */}
+                                {!approvingId && !rejectingId && user.status === UserStatus.PENDING && (
+                                  <>
+                                    <button
+                                      onClick={() => handleApprove(user.id)}
+                                      className="bg-slate-900 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-teal-600 transition-all shadow-md flex items-center gap-1.5"
+                                    >
+                                      <UserCheck size={15} /> อนุมัติ
+                                    </button>
+                                    <button
+                                      onClick={() => handleDelete(user)}
+                                      className="bg-white text-red-500 border border-red-200 px-3 py-2 rounded-xl text-sm font-bold hover:bg-red-500 hover:text-white transition-all flex items-center gap-1.5"
+                                    >
+                                      <Trash2 size={14} /> ยกเลิกคำขอ
+                                    </button>
+                                  </>
+                                )}
                               </div>
                             </td>
+
 
                           </tr>
                         ))

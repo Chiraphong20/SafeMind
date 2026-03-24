@@ -78,7 +78,14 @@ export default async function handler(req: any, res: any) {
             headers: apiHeaders,
             params: { role_id: 5, is_active: true, tmbpart, limit: 100 }
         });
-        const vhvs = (usersRes.data.items || []).filter((u: any) => u.line_user_id);
+        const allVhvs = (usersRes.data.items || []).filter((u: any) => u.line_user_id);
+        // Deduplicate by line_user_id — prevents duplicate notifications from multiple registrations
+        const seenLineIds = new Set<string>();
+        const vhvs = allVhvs.filter((u: any) => {
+          if (seenLineIds.has(u.line_user_id)) return false;
+          seenLineIds.add(u.line_user_id);
+          return true;
+        });
 
         if (vhvs.length === 0) {
             console.log(`No VHVs found for subdistrict ${tmbpart}. Skipping ${localPatients.length} patients.`);

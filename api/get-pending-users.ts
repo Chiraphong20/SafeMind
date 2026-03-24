@@ -24,9 +24,9 @@ export default async function handler(req: any, res: any) {
 
     const allUsers: any[] = Array.isArray(usersRes.data) ? usersRes.data : (usersRes.data.items || []);
 
-    // Filter users who are inactive (pending approval), role 3-6 (non-admin)
+    // Filter: inactive + non-admin + never modified by admin (updated_user=null = brand-new registration)
     const pending = allUsers
-      .filter(u => !u.is_active && u.role_id >= 3)
+      .filter(u => !u.is_active && u.role_id >= 3 && u.updated_user === null)
       .map(u => ({
         line_user_id: u.line_user_id,
         user_id: u.user_id,
