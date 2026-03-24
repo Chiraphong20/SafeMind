@@ -75,7 +75,7 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
   const [done, setDone] = useState(false);
 
   // URL ของ FastAPI Backend
-  const API_URL = "http://210.246.215.95:8000/register";
+  const API_URL = "http://210.246.215.95:8080/api/users";
 
   const getRoleId = (roleName: string) => {
     switch (roleName) {
