@@ -80,10 +80,10 @@ const SmiVTable: React.FC = () => {
         };
 
         // 1. ดึงข้อมูลรายการจากตาราง SMI-V
-        // (สามารถเพิ่ม limit หรือ filter ตาม hn ได้)
-        const smivRes = await fetch(`${API_BASE_URL}/smi-v?limit=100`, { headers });
+        // ดึงให้ได้มากที่สุดที่ API อนุญาต (500)
+        const smivRes = await fetch(`${API_BASE_URL}/smi-v?limit=500`, { headers });
         const smivData = await smivRes.json();
-        const smivItems: SmiV[] = smivData.items || [];
+        const smivItems: SmiV[] = Array.isArray(smivData) ? smivData : (smivData.items || []);
 
         // 2. หาระยะ HN ที่อยู่ในรายการ SMI-V เพื่อที่จะไปดึงชื่อ
         const uniqueHns = Array.from(new Set(smivItems.map(item => item.hn).filter(Boolean)));
@@ -91,28 +91,39 @@ const SmiVTable: React.FC = () => {
         // 3. เตรียมตัวแปร (Dictionary) สำหรับเก็บ HN -> ชื่อผู้ป่วย
         const patientMap: Record<string, string> = {};
 
-        // 4. ดึงข้อมูลผู้ป่วยทีละ HN เพื่อเอาชื่อมา Map (ถ้า API ปลายทางรองรับค้นหาทีละหลายคน สามารถปรับแต่งได้)
-        // หรือใช้วิธีดึง Patient มาทั้งหมดแล้ว Map หากข้อมูลไม่เยอะเกินไป
-        await Promise.all(
-          uniqueHns.map(async (hn) => {
-            try {
-              const res = await fetch(`${API_BASE_URL}/patients/hn/${hn}`, { headers });
-              if (res.ok) {
-                const patient: Patient = await res.json();
-                patientMap[hn] = patient.pt_name;
+        // 4. ทยอยดึงทีละ 10 Request พร้อมๆ กัน (Batch Processing) 
+        // ป้องกัน Error 500 จากการที่ Vercel หรือ FastAPI รัน 100+ requests พร้อมกัน (DDOS ตัวเอง)
+        const batchSize = 10;
+        for (let i = 0; i < uniqueHns.length; i += batchSize) {
+          const batch = uniqueHns.slice(i, i + batchSize);
+          await Promise.all(
+            batch.map(async (hn) => {
+              try {
+                const res = await fetch(`${API_BASE_URL}/patients/hn/${hn}`, { headers });
+                if (res.ok) {
+                  const patient: Patient = await res.json();
+                  patientMap[hn] = patient.pt_name;
+                }
+              } catch (e) {
+                // Ignore silent errors for individual missing patients
               }
-            } catch (e) {
-              console.error(`Failed to fetch patient ${hn}`, e);
-            }
-          })
-        );
+            })
+          );
+        }
 
         // 5. นำข้อมูล SMI-V มาประกอบร่าง (Map) กับชื่อผู้ป่วย
         const mappedData: MappedSmiV[] = smivItems.map(item => ({
           ...item,
           // หากหาชื่อไม่เจอ ให้แสดง fallback text
-          pt_name: patientMap[item.hn] || "(ไม่พบรายชื่อผู้ป่วย)"
+          pt_name: patientMap[item.hn] || "(ไม่มีในฐานข้อมูล Patient)"
         }));
+
+        // 6. เรียงลำดับจากวันที่ประเมินล่าสุด (entry_date) ให้อยู่บนสุดเสมอ
+        mappedData.sort((a, b) => {
+          const dateA = new Date(a.entry_date || 0).getTime();
+          const dateB = new Date(b.entry_date || 0).getTime();
+          return dateB - dateA;
+        });
 
         setData(mappedData);
 
