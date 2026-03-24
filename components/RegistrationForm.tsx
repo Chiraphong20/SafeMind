@@ -74,8 +74,9 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
 
-  // URL เปลี่ยนกลับมาใช้ชอง Local Vercel Database เพื่อให้เชื่อมกับหน้า Admin
-  const API_URL = "/api/register";
+  // ส่งข้อมูลเข้า 2 ฐานข้อมูลพร้อมกัน
+  const FASTAPI_URL = "/api/fastapi/register";
+  const VERCEL_API_URL = "/api/register";
 
   const getRoleId = (roleName: string) => {
     switch (roleName) {
@@ -113,7 +114,36 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
       const hc = healthCenters.find(h => h.id === formData.healthCenterId);
       const ps = policeStations.find(p => p.id === formData.policeStationId);
 
-      const payload = {
+      // 1. สร้าง Payload สำหรับส่งเข้า FastAPI (เพื่อให้โชว์ใน 8080/users)
+      const rawPayloadFastAPI = {
+        username: formData.username,
+        password: formData.password,
+        full_name: formData.fullName,
+        thai_id: formData.idCard || null,
+        phone_number: formData.phone,
+        is_kyc_verified: "0",
+        role_id: getRoleId(formData.role),
+        email: formData.email || email || null,
+        line_id: null,
+        line_user_id: lineUserId || null,
+        remark: formData.note || null,
+        register_type: 0,
+        addressid: null,
+        chwpart: isSubdistrictRole ? "นครราชสีมา" : null,
+        amppart: isSubdistrictRole ? "ปากช่อง" : null,
+        tmbpart: isSubdistrictRole ? formData.subdistrict : null,
+        moopart: isSubdistrictRole ? formData.village : null,
+        police_station_id: formData.role === 'ตำรวจ' && formData.policeStationId ? formData.policeStationId : null,
+        health_center_id: formData.role === 'รพ.สต.' && formData.healthCenterId ? formData.healthCenterId : null
+      };
+
+      // กรองค่า null และค่าว่าง (String ว่าง) ออกจาก JSON Object ทั้งหมด เพื่อป้องกัน FastAPI Error 500
+      const payloadFastAPI = Object.fromEntries(
+        Object.entries(rawPayloadFastAPI).filter(([, val]) => val !== null && val !== "")
+      );
+
+      // 2. สร้าง Payload สำหรับส่งเข้า Vercel Postgres DB (เพื่อให้โชว์ใน Vercel AdminDashboard)
+      const payloadVercel = {
         line_user_id: lineUserId || null,
         line_display_name: displayName || null,
         email: formData.email || email || null,
@@ -130,19 +160,24 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
         password: formData.password
       };
 
-      const response = await fetch(API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
+      // ยิงข้อมูลไปบันทึกทั้ง 2 ระบบพร้อมกัน
+      const [resFastAPI, resVercel] = await Promise.all([
+        fetch(FASTAPI_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify(payloadFastAPI)
+        }),
+        fetch(VERCEL_API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify(payloadVercel)
+        })
+      ]);
 
-      if (response.ok) {
+      if (resFastAPI.ok && resVercel.ok) {
         setDone(true);
       } else {
-        const errorData = await response.json();
+        const errorData = await (resFastAPI.ok ? resVercel : resFastAPI).json();
         console.error("API Error Response:", errorData);
         // รองรับทั้ง Error จาก FastAPI (detail) และ Local Vercel API (message, error, details)
         const errMsg = errorData.message || errorData.error || errorData.details || errorData.detail?.[0]?.msg || "API Connection Failed";
