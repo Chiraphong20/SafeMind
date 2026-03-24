@@ -5,6 +5,7 @@ import RegistrationForm from './components/RegistrationForm';
 import Approve from './components/Approve';
 import AdminLogin from './components/AdminLogin';
 import SmiVTable from './components/SmiVTable';
+import SpotMap from './components/SpotMap';
 import { LayoutDashboard, UserPlus, ShieldCheck, MapPin, FileText, Calendar, Video, Loader2 } from 'lucide-react';
 
 // --- Components ย่อย ---
@@ -87,9 +88,18 @@ function App() {
               : <AdminLogin onSuccess={() => setIsAdminAuthed(true)} />
           } />
 
+          <Route
+            path="/gis"
+            element={
+              <div className="h-screen w-full bg-slate-50 overflow-hidden">
+                <SpotMap />
+              </div>
+            }
+          />
+
           {/* 📄 หน้าอื่นๆ ทั้งหมด ให้มี margins แบบเดิม (max-w-5xl) */}
           <Route path="/*" element={
-            <main className="py-8 px-4 max-w-5xl mx-auto w-full">
+            <main className="py-8 px-4 max-w-5xl mx-auto w-full flex-1">
               <Routes>
                 {/* หน้าแรก / Register */}
                 <Route path="/" element={<RegistrationForm lineUserId={userId} />} />

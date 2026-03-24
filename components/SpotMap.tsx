@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { MapPin, Layers, AlertTriangle, BarChart3, Navigation, X, Filter, Activity, Loader2 } from 'lucide-react';
+import { MapPin, Layers, AlertTriangle, BarChart3, Navigation, X, Filter, Activity, Loader2, Menu, User, Bot, Search, ChevronLeft } from 'lucide-react';
 
 // ─── Important Places (Embedded from SQL data) ────────────────────────────────
 const IMPORTANT_PLACES = [
@@ -114,15 +114,37 @@ function assignCoords(patients: PatientMapItem[]): PatientMapItem[] {
 
 function loadLeaflet(): Promise<any> {
   return new Promise((resolve) => {
-    if ((window as any).L) return resolve((window as any).L);
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-    document.head.appendChild(link);
-    const script = document.createElement('script');
-    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-    script.onload = () => resolve((window as any).L);
-    document.head.appendChild(script);
+    if ((window as any).L && (window as any).L.markerClusterGroup) return resolve((window as any).L);
+    
+    const links = [
+      'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
+      'https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css',
+      'https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css'
+    ];
+    links.forEach(href => {
+      if (!document.querySelector(`link[href="${href}"]`)) {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = href;
+        document.head.appendChild(link);
+      }
+    });
+
+    const loadScript = (src: string) => {
+      return new Promise((res) => {
+        if (document.querySelector(`script[src="${src}"]`)) return res(true);
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = () => res(true);
+        document.head.appendChild(script);
+      });
+    };
+
+    loadScript('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js').then(() => {
+      loadScript('https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js').then(() => {
+        resolve((window as any).L);
+      });
+    });
   });
 }
 
@@ -143,6 +165,17 @@ const SpotMap: React.FC = () => {
 
   const [selectedItem, setSelectedItem] = useState<{ name: string; sub?: string; type: 'patient' | 'place' } | null>(null);
   const [stats, setStats] = useState({ red: 0, yellow: 0, green: 0 });
+
+  // UI States
+  const [showLeftPanel, setShowLeftPanel] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [dismissedWarnings, setDismissedWarnings] = useState<Set<string>>(new Set());
+  const markerClusterGroupRef = useRef<any>(null);
+  
+  // Filter checkboxes
+  const [behaviorFilters, setBehaviorFilters] = useState({ harmOthers: false, threaten: false, destroy: false });
+  const [drugFilters, setDrugFilters] = useState({ use1Month: false, quitWatch: false });
+  const [medFilters, setMedFilters] = useState({ missMeds: false });
 
   // Area filters
   const [selectedTmb, setSelectedTmb] = useState<string>('');
@@ -279,7 +312,25 @@ const SpotMap: React.FC = () => {
     if (!leafletMap.current || loading) return;
     loadLeaflet().then((L) => {
       patientMarkersRef.current.forEach(m => m.remove());
+      if (markerClusterGroupRef.current) {
+        markerClusterGroupRef.current.clearLayers();
+        if (leafletMap.current.hasLayer(markerClusterGroupRef.current)) {
+           leafletMap.current.removeLayer(markerClusterGroupRef.current);
+        }
+      }
       patientMarkersRef.current = [];
+      
+      markerClusterGroupRef.current = L.markerClusterGroup({
+        maxClusterRadius: 50,
+        iconCreateFunction: function(cluster: any) {
+          const count = cluster.getChildCount();
+          return L.divIcon({
+            html: `<div style="background-color: #3b82f6; color: white; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">${count}</div>`,
+            className: 'custom-cluster-icon',
+            iconSize: L.point(36, 36)
+          });
+        }
+      });
 
       const visible = patients.filter(p =>
         activeFilters.has(p.result) &&
@@ -290,7 +341,6 @@ const SpotMap: React.FC = () => {
         const iconUrl = getPatientIcon(pt.sex, pt.result);
         const icon = L.icon({ iconUrl, iconSize: [48, 48], iconAnchor: [24, 48], popupAnchor: [0, -48] });
         const marker = L.marker([pt.lat!, pt.lng!], { icon })
-          .addTo(leafletMap.current)
           .bindPopup(`
             <div style="font-family:sans-serif;min-width:160px">
               <b style="color:#1a202c">${pt.pt_name}</b><br>
@@ -300,7 +350,9 @@ const SpotMap: React.FC = () => {
             </div>`)
           .on('click', () => setSelectedItem({ name: pt.pt_name, sub: pt.hn, type: 'patient' }));
         patientMarkersRef.current.push(marker);
+        markerClusterGroupRef.current.addLayer(marker);
       });
+      leafletMap.current.addLayer(markerClusterGroupRef.current);
     });
   }, [patients, activeFilters, loading, selectedTmb, selectedMoo]);
 
@@ -372,228 +424,207 @@ const SpotMap: React.FC = () => {
   const mooOptions = Array.from({ length: 20 }, (_, i) => String(i + 1).padStart(2, '0')); // '01' to '20'
 
   return (
-    <div className="flex h-full overflow-hidden rounded-xl shadow-sm border border-slate-200 bg-white" style={{ minHeight: '600px' }}>
-
-      {/* ── Left Panel ───────────────────────────────────────────── */}
-      <div className="w-72 shrink-0 bg-white border-r border-slate-100 flex flex-col overflow-y-auto">
-        <div className="p-5 border-b border-slate-100">
-          <div className="flex items-center gap-3">
-            <div className="bg-blue-50 p-2 rounded-lg border border-blue-100"><MapPin className="text-blue-600" size={20} /></div>
-            <div>
-              <h2 className="text-base font-black text-slate-800">Spot Map</h2>
-              <p className="text-xs text-slate-400">อ.ปากช่อง จ.นครราชสีมา</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Stats */}
-        <div className="p-4 grid grid-cols-3 gap-2">
-          {[['red', stats.red, 'วิกฤต', '#E53E3E'], ['yellow', stats.yellow, 'เฝ้าระวัง', '#D69E2E'], ['green', stats.green, 'ปกติ', '#38A169']].map(([k, v, l, c]) => (
-            <div key={String(k)} className="text-center p-2 rounded-xl border" style={{ background: `${c}1A`, borderColor: `${c}40` }}>
-              <p className="text-xl font-black" style={{ color: String(c) }}>{v}</p>
-              <p className="text-xs font-bold" style={{ color: String(c) }}>{String(l)}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* Patient filters */}
-        <div className="px-4 pb-2">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1"><Filter size={11} /> ผู้ป่วย SMI-V</p>
-          {(['สีแดง', 'สีเหลือง', 'สีเขียว'] as const).map((r) => (
-            <button key={r} onClick={() => toggleFilter(r)}
-              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg mb-1 text-sm font-bold transition-all ${activeFilters.has(r) ? 'opacity-100' : 'opacity-35 grayscale'}`}
-              style={{ background: RESULT_COLORS[r] + '18', color: RESULT_COLORS[r] }}>
-              <span className="w-3 h-3 rounded-full" style={{ background: RESULT_COLORS[r] }} />
-              {r === 'สีแดง' ? '🔴 วิกฤต' : r === 'สีเหลือง' ? '🟡 เฝ้าระวัง' : '🟢 ปกติ'}
-            </button>
-          ))}
-          {/* Area filters */}
-          <div className="mt-2 space-y-1.5">
-            <div>
-              <label className="text-xs text-slate-400 font-bold mb-0.5 block">📍 ตำบล</label>
-              <select
-                value={selectedTmb}
-                onChange={e => { setSelectedTmb(e.target.value); setSelectedMoo(''); }}
-                className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-400"
-              >
-                <option value="">ทั้งหมด</option>
-                {tmbOptions.map(t => <option key={t} value={t}>{tmbNames[t] || `ตำบล ${t}`}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs text-slate-400 font-bold mb-0.5 block">🏘️ หมู่บ้าน</label>
-              <select
-                value={selectedMoo}
-                onChange={e => setSelectedMoo(e.target.value)}
-                className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-teal-400"
-              >
-                <option value="">ทั้งหมด</option>
-                {mooOptions.map(m => <option key={m} value={m}>หมู่ {m}</option>)}
-              </select>
-            </div>
-            {(selectedTmb || selectedMoo) && (
-              <button onClick={() => { setSelectedTmb(''); setSelectedMoo(''); }}
-                className="w-full text-xs text-slate-400 hover:text-red-500 flex items-center gap-1 justify-center py-1">
-                <X size={11} /> ล้าง Filter พื้นที่
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Place layers */}
-        <div className="px-4 pb-2">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1"><Layers size={11} /> Layer สถานที่สำคัญ</p>
-          {Object.entries(TYPE_LABELS).map(([t, l]) => (
-            <label key={t} className="flex items-center gap-2 py-1.5 px-2 hover:bg-slate-50 rounded-lg cursor-pointer">
-              <div onClick={() => toggleLayer(t)} className={`w-8 h-4 rounded-full transition-colors flex-shrink-0 ${activeLayers.has(t) ? 'bg-teal-400' : 'bg-slate-200'}`}>
-                <div className={`w-3 h-3 bg-white rounded-full shadow mt-0.5 transition-transform ${activeLayers.has(t) ? 'translate-x-4' : 'translate-x-0.5'}`} />
-              </div>
-              <img src={TYPE_ICONS[t]} alt="" className="w-5 h-5 object-contain" />
-              <span className="text-xs font-medium text-slate-600">{l}</span>
-            </label>
-          ))}
-
-          {/* Heatmap toggle */}
-          <label className="flex items-center gap-2 py-1.5 px-2 hover:bg-slate-50 rounded-lg cursor-pointer mt-1">
-            <div onClick={() => setShowHeatmap(!showHeatmap)} className={`w-8 h-4 rounded-full transition-colors flex-shrink-0 ${showHeatmap ? 'bg-red-400' : 'bg-slate-200'}`}>
-              <div className={`w-3 h-3 bg-white rounded-full shadow mt-0.5 transition-transform ${showHeatmap ? 'translate-x-4' : 'translate-x-0.5'}`} />
-            </div>
-            <span className="text-xs font-medium text-slate-600">🌡️ Hotspot Heatmap</span>
-          </label>
-        </div>
-
-        {/* Route */}
-        <div className="px-4 pb-3">
-          <button onClick={handleRoute}
-            className="w-full flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-all">
-            <Navigation size={15} /> แผนเส้นทางเยี่ยมบ้าน (เคสแดง)
+    <div className="flex flex-col h-full w-full bg-slate-50 font-sans">
+      {/* ── Top Navbar ───────────────────────────────────────────── */}
+      <div className="h-14 bg-gradient-to-r from-blue-700 to-blue-600 flex items-center justify-between px-4 text-white shrink-0 shadow-md z-50">
+        <div className="flex items-center gap-3">
+          <button onClick={() => setShowLeftPanel(!showLeftPanel)} className="p-1.5 hover:bg-white/10 rounded-lg transition-colors">
+            <Menu size={22} />
           </button>
-        </div>
-
-        {/* Patient mini list */}
-        <div className="px-4 pb-4 flex-1 overflow-y-auto">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1">
-            <Activity size={11} /> รายการ ({filteredPts.length})
-          </p>
-          {filteredPts.map((pt) => (
-            <div key={pt.hn + pt.result}
-              onClick={() => { setSelectedItem({ name: pt.pt_name, sub: pt.hn, type: 'patient' }); if (leafletMap.current && pt.lat && pt.lng) leafletMap.current.setView([pt.lat, pt.lng], 16); }}
-              className="flex items-center gap-2 px-2 py-1.5 bg-white border border-slate-100 rounded-lg cursor-pointer hover:border-blue-200 hover:bg-blue-50/50 transition-all mb-1">
-              <img src={getPatientIcon(pt.sex, pt.result)} alt="" className="w-5 h-5 object-contain shrink-0" />
-              <span className="text-xs font-medium text-slate-700 truncate">{pt.pt_name}</span>
-              <span className="ml-auto text-xs text-slate-400 font-mono shrink-0">{pt.hn}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Map ──────────────────────────────────────────────────── */}
-      <div className="flex-1 relative">
-        {loading && (
-          <div className="absolute inset-0 z-30 bg-slate-50 flex flex-col items-center justify-center gap-3">
-            <Loader2 className="animate-spin text-blue-500" size={32} />
-            <p className="text-slate-500 font-medium">กำลังโหลดข้อมูลแผนที่...</p>
-          </div>
-        )}
-        <div ref={mapRef} className="w-full h-full" style={{ minHeight: '500px' }} />
-
-        {/* Emergency banner */}
-        {stats.red >= 3 && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-red-600 text-white px-5 py-2.5 rounded-xl shadow-lg flex items-center gap-2 font-bold text-sm animate-bounce">
-            <AlertTriangle size={16} className="animate-pulse" />
-            ⚠ พบเคสวิกฤต {stats.red} ราย — ต้องการดูแลด่วน!
-          </div>
-        )}
-
-        {/* Legend */}
-        <div className="absolute bottom-4 left-4 z-20 bg-white/95 backdrop-blur-sm border border-slate-200 rounded-xl p-3 shadow-md">
-          <p className="text-xs font-bold text-slate-500 mb-2">สัญลักษณ์ผู้ป่วย</p>
-          {([
-            ['/y_r.png', '/x_r.png', 'สีแดง (วิกฤต)'],
-            ['/y_o.png', '/x_o.png', 'สีส้ม (เฝ้าระวังสูง)'],
-            ['/y_y.png', '/x_y.png', 'สีเหลือง (เฝ้าระวัง)'],
-            ['/y_g.png', '/x_g.png', 'สีเขียว (ปกติ)'],
-          ] as const).map(([m, f, label]) => (
-            <div key={label} className="flex items-center gap-1.5 mb-1.5">
-              <img src={m} alt="" className="w-5 h-5 object-contain" title="ชาย" />
-              <img src={f} alt="" className="w-5 h-5 object-contain" title="หญิง" />
-              <span className="text-xs text-slate-600">{label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Right Stats Panel ──────────────────────────────────── */}
-      <div className="w-60 shrink-0 bg-white border-l border-slate-100 flex flex-col overflow-y-auto">
-        <div className="p-4 border-b border-slate-100">
           <div className="flex items-center gap-2">
-            <BarChart3 className="text-slate-500" size={16} />
-            <h3 className="font-bold text-slate-700 text-sm">Area Statistics</h3>
+            <div className="bg-white/20 p-1.5 rounded-lg"><MapPin size={18} /></div>
+            <h1 className="font-bold text-sm tracking-wide">SafeMind GIS <span className="text-blue-200 font-normal">| แผนที่จุดเสี่ยง (Spot Map)</span></h1>
           </div>
         </div>
-
-        <div className="p-4">
-          <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mb-3">ตามหมู่บ้าน</p>
-          {(() => {
-            const byMoo: Record<string, number[]> = {};
-            patients.forEach(p => {
-              const moo = p.moopart || '?';
-              if (!byMoo[moo]) byMoo[moo] = [0, 0, 0];
-              if (p.result === 'สีแดง') byMoo[moo][0]++;
-              else if (p.result === 'สีเหลือง') byMoo[moo][1]++;
-              else byMoo[moo][2]++;
-            });
-            return Object.entries(byMoo).sort((a, b) => b[1][0] - a[1][0]).map(([moo, counts]) => {
-              const total = counts.reduce((a, b) => a + b, 0);
-              return (
-                <div key={moo} className="mb-3">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-xs font-bold text-slate-600">หมู่ {moo}</span>
-                    <span className="text-xs text-slate-400">{total} ราย</span>
-                  </div>
-                  <div className="w-full h-2 rounded-full overflow-hidden flex gap-px bg-slate-100">
-                    {counts[0] > 0 && <div className="bg-red-500 h-full" style={{ width: `${counts[0] / total * 100}%` }} />}
-                    {counts[1] > 0 && <div className="bg-yellow-400 h-full" style={{ width: `${counts[1] / total * 100}%` }} />}
-                    {counts[2] > 0 && <div className="bg-emerald-400 h-full" style={{ width: `${counts[2] / total * 100}%` }} />}
-                  </div>
-                </div>
-              );
-            });
-          })()}
-        </div>
-
-        {/* Selected info */}
-        {selectedItem && (
-          <div className="mx-3 mb-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
-            <div className="flex justify-between items-start">
-              <p className="text-xs font-bold text-slate-400 uppercase mb-1">📍 เลือก</p>
-              <button onClick={() => setSelectedItem(null)} className="text-slate-300 hover:text-slate-500"><X size={13} /></button>
-            </div>
-            <p className="font-bold text-slate-800 text-sm leading-snug">{selectedItem.name}</p>
-            {selectedItem.sub && <p className="text-xs text-slate-400 mt-0.5">{selectedItem.sub}</p>}
+        
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4 text-xs font-bold">
+            <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]"></span> {stats.red} เคสแดง</div>
+            <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-yellow-400"></span> {stats.yellow} เหลือง</div>
+            <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-400"></span> {stats.green} เขียว</div>
           </div>
-        )}
+          <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center border-2 border-slate-700 cursor-pointer hover:border-blue-400 transition-colors">
+            <User size={16} className="text-slate-300" />
+          </div>
+        </div>
+      </div>
 
-        {/* Emergency alerts */}
-        <div className="px-3 pb-4">
-          <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mb-2 flex items-center gap-1">
-            <AlertTriangle size={11} className="text-red-400" /> Emergency Alerts
-          </p>
-          {patients.filter(p => p.result === 'สีแดง').length === 0 ? (
-            <p className="text-xs text-slate-400 text-center py-3">ไม่มีเหตุฉุกเฉิน</p>
-          ) : (
-            patients.filter(p => p.result === 'สีแดง').map(pt => (
-              <div key={pt.hn}
-                onClick={() => { setSelectedItem({ name: pt.pt_name, sub: pt.hn, type: 'patient' }); if (leafletMap.current && pt.lat && pt.lng) leafletMap.current.setView([pt.lat, pt.lng], 16); }}
-                className="mb-2 p-2.5 bg-red-50 border border-red-100 rounded-xl cursor-pointer hover:border-red-300 transition-all">
-                <div className="flex items-center gap-1.5 mb-0.5">
-                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                  <p className="text-xs font-bold text-red-700 truncate">{pt.pt_name}</p>
-                </div>
-                <p className="text-xs text-red-400 font-mono">{pt.hn} · หมู่ {pt.moopart || '-'}</p>
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* ── Left Filter Panel ───────────────────────────────────────────── */}
+        <div className={`w-[320px] bg-white border-r border-slate-200 flex flex-col transition-all duration-300 z-40 ${showLeftPanel ? 'translate-x-0' : '-translate-x-full absolute h-full'}`}>
+          <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+            <h2 className="font-bold text-sm text-slate-700 tracking-wider">FILTER PANEL</h2>
+            <button onClick={() => setShowLeftPanel(false)} className="text-slate-400 hover:text-slate-600 p-1 bg-slate-50 hover:bg-slate-100 rounded-md">
+              <ChevronLeft size={18} />
+            </button>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-5 space-y-6">
+            {/* Risk Level */}
+            <div>
+              <p className="text-xs font-black text-slate-400 mb-3 tracking-widest uppercase">ระดับความเสี่ยง (RISK LEVEL)</p>
+              <div className="space-y-3">
+                {(['สีแดง', 'สีเหลือง', 'สีเขียว'] as const).map((r) => (
+                  <label key={r} className="flex items-center gap-3 cursor-pointer group">
+                    <div className={`w-5 h-5 rounded flex items-center justify-center transition-colors border ${activeFilters.has(r) ? 'bg-blue-500 border-blue-500' : 'bg-white border-slate-300 group-hover:border-blue-400'}`}>
+                      {activeFilters.has(r) && <span className="text-white text-xs font-bold">✓</span>}
+                    </div>
+                    <span className="text-sm font-bold text-slate-700">{r === 'สีแดง' ? 'Red (วิกฤต/เสี่ยงสูง)' : r === 'สีเหลือง' ? 'Yellow (เฝ้าระวัง)' : 'Green (ปกติ)'}</span>
+                    <input type="checkbox" className="hidden" checked={activeFilters.has(r)} onChange={() => toggleFilter(r)} />
+                  </label>
+                ))}
               </div>
-            ))
+            </div>
+
+            {/* Behavior */}
+            <div>
+              <p className="text-xs font-black text-slate-400 mb-3 tracking-widest uppercase">พฤติกรรมความเสี่ยง (BEHAVIOR)</p>
+              <div className="space-y-3">
+                {[
+                  { id: 'harmOthers', label: 'เคยทำร้ายผู้อื่น' },
+                  { id: 'threaten', label: 'เคยขู่ทำร้าย' },
+                  { id: 'destroy', label: 'เคยทำลายทรัพย์สิน' }
+                ].map(b => (
+                  <label key={b.id} className="flex items-center gap-3 cursor-pointer group">
+                    <div className={`w-5 h-5 rounded flex items-center justify-center transition-colors border ${behaviorFilters[b.id as keyof typeof behaviorFilters] ? 'bg-blue-500 border-blue-500' : 'bg-white border-slate-300 group-hover:border-blue-400'}`}>
+                      {behaviorFilters[b.id as keyof typeof behaviorFilters] && <span className="text-white text-xs font-bold">✓</span>}
+                    </div>
+                    <span className="text-sm font-medium text-slate-600">{b.label}</span>
+                    <input type="checkbox" className="hidden" checked={behaviorFilters[b.id as keyof typeof behaviorFilters]} 
+                      onChange={() => setBehaviorFilters(prev => ({...prev, [b.id]: !prev[b.id as keyof typeof behaviorFilters]}))} />
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Drugs */}
+            <div>
+              <p className="text-xs font-black text-slate-400 mb-3 tracking-widest uppercase">การใช้สารเสพติด</p>
+              <div className="space-y-3">
+                {[
+                  { id: 'use1Month', label: 'ใช้สารใน 1 เดือน' },
+                  { id: 'quitWatch', label: 'เลิกแล้ว (เฝ้าระวัง)' }
+                ].map(b => (
+                  <label key={b.id} className="flex items-center gap-3 cursor-pointer group">
+                    <div className={`w-5 h-5 rounded flex items-center justify-center transition-colors border ${drugFilters[b.id as keyof typeof drugFilters] ? 'bg-blue-500 border-blue-500' : 'bg-white border-slate-300 group-hover:border-blue-400'}`}>
+                      {drugFilters[b.id as keyof typeof drugFilters] && <span className="text-white text-xs font-bold">✓</span>}
+                    </div>
+                    <span className="text-sm font-medium text-slate-600">{b.label}</span>
+                    <input type="checkbox" className="hidden" checked={drugFilters[b.id as keyof typeof drugFilters]} 
+                      onChange={() => setDrugFilters(prev => ({...prev, [b.id]: !prev[b.id as keyof typeof drugFilters]}))} />
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Medication */}
+            <div>
+              <p className="text-xs font-black text-slate-400 mb-3 tracking-widest uppercase">การรับประทานยา</p>
+              <div className="space-y-3">
+                  <label className="flex items-center gap-3 cursor-pointer group">
+                    <div className={`w-5 h-5 rounded flex items-center justify-center transition-colors border ${medFilters.missMeds ? 'bg-blue-500 border-blue-500' : 'bg-white border-slate-300 group-hover:border-blue-400'}`}>
+                      {medFilters.missMeds && <span className="text-white text-xs font-bold">✓</span>}
+                    </div>
+                    <span className="text-sm font-medium text-slate-600">ขาดยา / หดยาเอง</span>
+                    <input type="checkbox" className="hidden" checked={medFilters.missMeds} 
+                      onChange={() => setMedFilters(prev => ({...prev, missMeds: !prev.missMeds}))} />
+                  </label>
+              </div>
+            </div>
+            
+            {/* Area Filter */}
+            <div className="pt-2">
+              <p className="text-xs font-black text-slate-400 mb-3 tracking-widest uppercase">พื้นที่</p>
+              <div className="space-y-2">
+                <select value={selectedTmb} onChange={e => { setSelectedTmb(e.target.value); setSelectedMoo(''); }}
+                  className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-slate-50 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                  <option value="">ทุกตำบล</option>
+                  {tmbOptions.map(t => <option key={t} value={t}>{tmbNames[t] || `ตำบล ${t}`}</option>)}
+                </select>
+                <select value={selectedMoo} onChange={e => setSelectedMoo(e.target.value)}
+                  className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-slate-50 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                  <option value="">ทุกหมู่บ้าน</option>
+                  {mooOptions.map(m => <option key={m} value={m}>หมู่ {m}</option>)}
+                </select>
+              </div>
+            </div>
+            {/* Placeholder to make bottom pad */}
+            <div className="h-6"></div>
+          </div>
+          
+          <div className="p-4 bg-white border-t border-slate-100 mt-auto">
+            <button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md active:scale-[0.98]">
+              <Search size={18} /> ค้นหาพิกัด
+            </button>
+          </div>
+        </div>
+
+        {/* ── Map Area ───────────────────────────────────────────── */}
+        <div className="flex-1 relative bg-slate-100 overflow-hidden">
+          {loading && (
+            <div className="absolute inset-0 z-[1000] bg-white/50 backdrop-blur-sm flex flex-col items-center justify-center gap-3">
+              <Loader2 className="animate-spin text-blue-600" size={40} />
+              <p className="text-blue-900 font-bold tracking-wider">กำลังโหลดข้อมูลแผนที่...</p>
+            </div>
           )}
+          
+          <div ref={mapRef} className="absolute inset-0 z-0" />
+
+          {/* Floating Search Bar */}
+          <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[400] w-full max-w-lg px-4 pointer-events-auto">
+            <div className="bg-white rounded-full shadow-lg border border-slate-200 flex items-center px-4 py-3 gap-3 transition-shadow hover:shadow-xl focus-within:ring-2 focus-within:ring-blue-400">
+              <Search className="text-slate-400 shrink-0" size={20} />
+              <input 
+                type="text" 
+                placeholder="ค้นหา HN, ชื่อผู้ป่วย, หรือหมู่บ้าน..." 
+                className="flex-1 bg-transparent border-none outline-none text-sm font-medium text-slate-700 placeholder:text-slate-400 min-w-0"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* SafeBird Warning */}
+          {stats.red >= 3 && !dismissedWarnings.has('red_cluster_1') && (
+            <div className="absolute bottom-24 right-8 z-[500] w-[340px] animate-in slide-in-from-bottom-5 fade-in duration-500">
+              <div className="bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-red-100 p-5 relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-1 bg-red-500"></div>
+                <div className="flex gap-4">
+                  <div className="w-14 h-14 bg-red-100 rounded-2xl flex items-center justify-center shrink-0 border border-red-200 relative">
+                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-ping"></div>
+                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></div>
+                    <Bot size={28} className="text-red-500" />
+                  </div>
+                  <div>
+                    <h3 className="text-red-600 font-black text-xs tracking-wider mb-1">SAFEBIRD WARNING!</h3>
+                    <p className="text-slate-600 text-sm font-medium leading-snug">
+                      พบ Cluster <b>เคสสีแดง {stats.red} ราย</b> ในรัศมี 300 เมตร บริเวณชุมชน รพ.สต.หนองสาหร่าย แนะนำประสานฝ่ายปกครองทันที
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 flex items-center gap-3">
+                  <button className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 rounded-xl text-sm transition-colors shadow-sm active:scale-95 text-center">
+                    แจ้งฝ่ายปกครอง
+                  </button>
+                  <button onClick={() => setDismissedWarnings(prev => new Set([...prev, 'red_cluster_1']))} className="px-4 py-2.5 text-slate-500 hover:bg-slate-100 rounded-xl text-sm font-bold transition-colors">
+                    ปิด
+                  </button>
+                </div>
+              </div>
+              
+              {/* Tooltip arrow */}
+              <div className="absolute -bottom-2 right-8 w-4 h-4 bg-white border-b border-r border-red-100 rotate-45 transform origin-center translate-y-px z-[-1]"></div>
+            </div>
+          )}
+
+          {/* Chatbot Icon */}
+          <button className="absolute bottom-6 right-6 z-[500] w-14 h-14 bg-gradient-to-tr from-blue-700 to-indigo-500 rounded-2xl shadow-lg flex items-center justify-center hover:scale-110 hover:shadow-xl transition-all active:scale-95 group border border-blue-400/50">
+            <Bot size={28} className="text-white group-hover:animate-bounce" />
+            {stats.red >= 3 && !dismissedWarnings.has('red_cluster_1') && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white"></span>
+            )}
+          </button>
+          
         </div>
       </div>
     </div>
