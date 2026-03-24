@@ -10,8 +10,13 @@ const pakChongSubdistricts = [
   'วังกะทะ', 'วังไทร', 'หนองน้ำแดง', 'หนองสาหร่าย', 'หมูสี', 'โป่งตาลอง'
 ];
 
+const subdistrictCodeMap: Record<string, string> = {
+  'ปากช่อง': '01', 'กลางดง': '02', 'จันทึก': '03', 'วังกะทะ': '04',
+  'หมูสี': '05', 'หนองสาหร่าย': '06', 'ขนงพระ': '07', 'โป่งตาลอง': '08',
+  'คลองม่วง': '09', 'หนองน้ำแดง': '10', 'วังไทร': '11', 'พญาเย็น': '12'
+};
+
 // Mapping Subdistrict to number of villages for simple dropdown generation
-// For a real production app, you might want specific village names instead of numbers
 const villageCountBySubdistrict: Record<string, number> = {
   'กลางดง': 15, 'ขนงพระ': 15, 'คลองม่วง': 11, 'จันทึก': 22, 'ปากช่อง': 22, 'พญาเย็น': 14,
   'วังกะทะ': 24, 'วังไทร': 18, 'หนองน้ำแดง': 11, 'หนองสาหร่าย': 25, 'หมูสี': 19, 'โป่งตาลอง': 13
@@ -114,6 +119,11 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
       const hc = healthCenters.find(h => h.id === formData.healthCenterId);
       const ps = policeStations.find(p => p.id === formData.policeStationId);
 
+      // Map ที่อยู่เป็นรหัสตามที่ Database FastAPI ต้องการ (นครราชสีมา=30, ปากช่อง=21, ตำบล=)
+      const tmbCode = isSubdistrictRole && formData.subdistrict ? subdistrictCodeMap[formData.subdistrict] : null;
+      const addrId = tmbCode ? `3021${tmbCode}` : null;
+      const mooPlain = isSubdistrictRole && formData.village ? formData.village.replace("หมู่ ", "") : null;
+
       // 1. สร้าง Payload หลัก (ใช้โครงสร้างเดียวกับ FastAPI)
       const rawPayload = {
         username: formData.username,
@@ -128,11 +138,11 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
         line_user_id: lineUserId || null,
         remark: formData.note || null,
         register_type: 1,
-        addressid: null,
-        chwpart: isSubdistrictRole ? "นครราชสีมา" : null,
-        amppart: isSubdistrictRole ? "ปากช่อง" : null,
-        tmbpart: isSubdistrictRole ? formData.subdistrict : null,
-        moopart: isSubdistrictRole ? formData.village : null,
+        addressid: addrId,
+        chwpart: isSubdistrictRole ? "30" : null,
+        amppart: isSubdistrictRole ? "21" : null,
+        tmbpart: tmbCode,
+        moopart: mooPlain,
         police_station_id: formData.role === 'ตำรวจ' && formData.policeStationId ? formData.policeStationId : null,
         health_center_id: formData.role === 'รพ.สต.' && formData.healthCenterId ? formData.healthCenterId : null
       };
