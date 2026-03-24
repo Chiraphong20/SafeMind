@@ -28,7 +28,8 @@ const Approve: React.FC<{ onSignOut?: () => void }> = ({ onSignOut }) => {
   // User List State
   const [users, setUsers] = useState<UserRegistration[]>([]);
   const [loading, setLoading] = useState(false);
-  const [approvingId, setApprovingId] = useState<string | null>(null); // track which user is being approved
+  const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
   const API_BASE_URL = "/api";
@@ -85,8 +86,8 @@ const Approve: React.FC<{ onSignOut?: () => void }> = ({ onSignOut }) => {
       });
 
       if (response.ok) {
-        // Delay refresh so the list doesn’t re-render under the user’s cursor
-        await new Promise(r => setTimeout(r, 600));
+        // Short delay so list doesn't re-render under cursor
+        await new Promise(r => setTimeout(r, 200));
         await fetchUsers();
       } else {
         alert('เกิดข้อผิดพลาดในการอนุมัติ');
@@ -99,7 +100,10 @@ const Approve: React.FC<{ onSignOut?: () => void }> = ({ onSignOut }) => {
   };
 
   const handleDelete = async (user: UserRegistration) => {
-    if (!window.confirm(`ยืนยันลบผู้ใช้ "${user.fullName}" ออกจากระบบ? ไม่สามารถย้อนคืนได้`)) return;
+    if (approvingId || rejectingId) return;
+    if (!window.confirm(`ยกเลิกคำขอของ "${user.fullName}" ?
+ผู้ใช้จะถูกเอาออกจากระบบ`)) return;
+    setRejectingId(user.id);
     try {
       const response = await fetch(`${API_BASE_URL}/delete-user`, {
         method: 'DELETE',
@@ -107,13 +111,16 @@ const Approve: React.FC<{ onSignOut?: () => void }> = ({ onSignOut }) => {
         body: JSON.stringify({ user_id: user.userId })
       });
       if (response.ok) {
-        await fetchUsers(); // refresh จาก server อัตโนมัติ
+        await new Promise(r => setTimeout(r, 200));
+        await fetchUsers();
       } else {
         const err = await response.json().catch(() => ({}));
         alert('เกิดข้อผิดพลาด: ' + (err.details || err.error || response.status));
       }
     } catch (error) {
       alert('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+    } finally {
+      setRejectingId(null);
     }
   };
 
@@ -283,11 +290,19 @@ const Approve: React.FC<{ onSignOut?: () => void }> = ({ onSignOut }) => {
                                 )}
                                 <button
                                   onClick={() => handleDelete(user)}
-                                  disabled={!!approvingId}
-                                  className="bg-red-50 text-red-500 border border-red-200 px-3 py-2 rounded-xl text-sm font-bold hover:bg-red-500 hover:text-white transition-all flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
-                                  title="ลบผู้ใช้"
+                                  disabled={!!approvingId || !!rejectingId}
+                                  className={`px-3 py-2 rounded-xl text-sm font-bold border transition-all flex items-center gap-1.5
+                                    ${rejectingId === user.id
+                                      ? 'bg-red-100 text-red-400 border-red-200 cursor-wait'
+                                      : approvingId || rejectingId
+                                      ? 'bg-slate-100 text-slate-300 border-slate-200 cursor-not-allowed'
+                                      : 'bg-red-50 text-red-500 border-red-200 hover:bg-red-500 hover:text-white'
+                                    }`}
                                 >
-                                  <Trash2 size={15} />
+                                  {rejectingId === user.id
+                                    ? <span className="w-3.5 h-3.5 border-2 border-red-300 border-t-red-600 rounded-full animate-spin inline-block" />
+                                    : <Trash2 size={14} />}
+                                  ยกเลิกคำขอ
                                 </button>
                               </div>
                             </td>
