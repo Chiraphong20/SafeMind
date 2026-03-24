@@ -3,6 +3,7 @@ import liff from '@line/liff';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import RegistrationForm from './components/RegistrationForm';
 import AdminDashboard from './components/AdminDashboard';
+import SmiVTable from './components/SmiVTable';
 import { LayoutDashboard, UserPlus, ShieldCheck, MapPin, FileText, Calendar, Video, Loader2 } from 'lucide-react';
 
 // --- Components ย่อย ---
@@ -86,6 +87,7 @@ function App() {
             <Route path="/admin" element={<AdminDashboard />} />
 
             {/* หน้าอื่นๆ */}
+            <Route path="/smiv" element={<SmiVTable />} />
             <Route path="/pin" element={<PlaceholderPage title="ปักหมุดเยี่ยมบ้าน" icon={MapPin} color="bg-green-50 text-green-700 border-green-200" />} />
             <Route path="/save" element={<PlaceholderPage title="บันทึกข้อมูล" icon={FileText} color="bg-blue-50 text-blue-700 border-blue-200" />} />
             <Route path="/check" element={<PlaceholderPage title="ตรวจสอบผู้ป่วย" icon={ShieldCheck} color="bg-green-50 text-green-700 border-green-200" />} />
