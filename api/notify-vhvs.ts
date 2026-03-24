@@ -93,9 +93,25 @@ export default async function handler(req: any, res: any) {
             }
         }
 
+        const samplePt = localPatients[0] as any;
+        const chw = samplePt.chwpart || "30"; 
+        const amp = samplePt.amppart || "21";
+        const tmb = tmbpart;
+        const addressId = `${chw}${amp}${tmb}`;
+
+        let areaName = `รหัสย่อย: ${tmb}`;
+        try {
+             const addrRes = await axios.get(`http://210.246.215.95:8000/thaiaddress/${addressId}`);
+             if (addrRes.data && addrRes.data.full_name) {
+                 areaName = addrRes.data.full_name;
+             }
+        } catch (e: any) {
+             console.error("Failed to fetch address name", e?.message);
+        }
+
         // Construct the localized payload string
         let messageLines = [
-            `📊 สรุปรายงานผู้ป่วยเฝ้าระวัง SMI-V ประจำพื้นที่ของคุณ (รหัสย่อย: ${tmbpart})\n`
+            `📊 สรุปรายงานผู้ป่วยเฝ้าระวัง SMI-V ประจำพื้นที่\n📍 ${areaName}\n`
         ];
 
         for (const [color, namesList] of Object.entries(colors)) {

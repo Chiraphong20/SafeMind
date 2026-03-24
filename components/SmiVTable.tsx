@@ -62,6 +62,8 @@ interface MappedSmiV extends SmiV {
   pt_name: string;
   // เพิ่ม tmbpart เพื่อเอาไว้ส่งไลน์แยกตามพื้นที่ อสม.
   tmbpart?: string;
+  amppart?: string;
+  chwpart?: string;
 }
 
 const SmiVTable: React.FC = () => {
@@ -116,7 +118,7 @@ const SmiVTable: React.FC = () => {
         const uniqueHns = Array.from(new Set(recentSmivItems.map(item => item.hn).filter(Boolean)));
 
         // 3. เตรียมตัวแปร (Dictionary) สำหรับเก็บ HN -> ชื่อผู้ป่วยและพื้นที่
-        const patientMap: Record<string, { pt_name: string; tmbpart: string }> = {};
+        const patientMap: Record<string, { pt_name: string; tmbpart: string; amppart: string; chwpart: string }> = {};
 
         // 4. ทยอยดึงทีละ 10 Request พร้อมๆ กัน (Batch Processing) 
         // ป้องกัน Error 500 จากการที่ Vercel หรือ FastAPI รัน 100+ requests พร้อมกัน (DDOS ตัวเอง)
@@ -131,7 +133,9 @@ const SmiVTable: React.FC = () => {
                   const patient: Patient = await res.json();
                   patientMap[hn] = {
                       pt_name: patient.pt_name || "(ไม่มีชื่อ)",
-                      tmbpart: patient.tmbpart || ""
+                      tmbpart: patient.tmbpart || "",
+                      amppart: patient.amppart || "",
+                      chwpart: patient.chwpart || ""
                   };
                 }
               } catch (e) {
@@ -148,7 +152,9 @@ const SmiVTable: React.FC = () => {
           .map(item => ({
             ...item,
             pt_name: patientMap[item.hn].pt_name,
-            tmbpart: patientMap[item.hn].tmbpart
+            tmbpart: patientMap[item.hn].tmbpart,
+            amppart: patientMap[item.hn].amppart,
+            chwpart: patientMap[item.hn].chwpart
           }));
 
         setData(mappedData);
