@@ -65,8 +65,8 @@ const SmiVTable: React.FC = () => {
   const [data, setData] = useState<MappedSmiV[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // สมมติว่าดึงจาก Vercel Serverless หรือฝั่ง FastAPI ตรงๆ
-  const API_BASE_URL = "http://210.246.215.95:8000";
+  // ใช้ Proxy Route ที่เราเซ็ตไว้ใน vercel.json และ vite.config.ts เพื่อแก้ปัญหา Mixed Content (HTTP -> HTTPS)
+  const API_BASE_URL = "/api/fastapi";
   // ข้อควรระวัง: ในการโปรดักชั่น ควรเก็บ Token ไว้ที่ฝั่ง Backend / API Route ของ Next.js
   const token = process.env.NEXT_PUBLIC_API_TOKEN || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbjk5IiwiaWF0IjoxNzc0MjM3NDQ4LCJleHAiOjE3NzQyMzkyNDh9.4RpktWIcm_ROcXV3TM8RoncIEYnwyMLjMkfUq1ZoQ64";
 
