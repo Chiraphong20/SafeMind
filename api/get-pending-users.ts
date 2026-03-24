@@ -12,7 +12,7 @@ export default async function handler(req: any, res: any) {
   try {
     // Get machine token using admin99 credentials
     const tokenRes = await axios.post(`${FASTAPI}/token`,
-      new URLSearchParams({ username: 'admin99', password: 'Baily1234' }),
+      new URLSearchParams({ username: 'admin99', password: 'admin99' }),
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
     );
     const token = tokenRes.data.access_token;
