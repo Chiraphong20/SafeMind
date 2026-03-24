@@ -18,36 +18,30 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onSuccess }) => {
     setLoading(true);
 
     try {
-      const res = await fetch('http://210.246.215.95:8000/token', {
+      const res = await fetch('/api/admin-login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ username, password }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
       });
 
       if (!res.ok) {
-        setError('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+        const err = await res.json().catch(() => ({}));
+        setError(err.error === 'Invalid credentials'
+          ? 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'
+          : 'เกิดข้อผิดพลาด กรุณาลองใหม่');
         return;
       }
 
       const data = await res.json();
 
-      // Check role - fetch user profile to verify admin role
-      const profileRes = await fetch('http://210.246.215.95:8000/users/me', {
-        headers: { Authorization: `Bearer ${data.access_token}` },
-      });
-
-      const profile = profileRes.ok ? await profileRes.json() : null;
-      const roleId = profile?.role_id;
-
-      // Allow role_id 1 (Admin) only
-      if (roleId !== 1 && roleId !== undefined) {
+      // Check role — only admin (role_id = 1) allowed
+      if (data.role_id !== null && data.role_id !== 1) {
         setError('คุณไม่มีสิทธิ์เข้าถึงหน้านี้ (จำเป็นต้องเป็น Admin)');
         return;
       }
 
-      // Store token in session
       sessionStorage.setItem('admin_token', data.access_token);
-      sessionStorage.setItem('admin_user', profile?.full_name || username);
+      sessionStorage.setItem('admin_user', data.full_name || username);
       onSuccess();
     } catch {
       setError('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาลองใหม่');
