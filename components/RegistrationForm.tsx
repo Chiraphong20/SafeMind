@@ -74,8 +74,8 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
 
-  // URL ของ FastAPI Backend
-  const API_URL = "http://210.246.215.95:8000/register";
+  // URL ของ FastAPI Backend ผ่าน Proxy ของ Vercel เพื่อแก้ปัญหา Mixed Content (HTTP/HTTPS)
+  const API_URL = "/api/proxy-register";
 
   const getRoleId = (roleName: string) => {
     switch (roleName) {
