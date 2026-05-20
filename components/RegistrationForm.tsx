@@ -61,14 +61,16 @@ const policeStations = [
 // ------------------------------------
 
 const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
-  const [formData, setFormData] = useState({ 
+  const [tab, setTab] = useState<'new' | 'link'>('new');
+
+  // --- Tab: สมัครใหม่ ---
+  const [formData, setFormData] = useState({
     username: '',
     password: '',
     email: '',
-    fullName: '', 
+    fullName: '',
     lineId: '',
-
-    role: '', 
+    role: '',
     phone: '',
     idCard: '',
     note: '',
@@ -80,9 +82,37 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
 
-  // ส่งข้อมูลเข้า 2 ฐานข้อมูลพร้อมกัน
+  // --- Tab: มีบัญชีแล้ว ---
+  const [linkForm, setLinkForm] = useState({ username: '', password: '' });
+  const [linkLoading, setLinkLoading] = useState(false);
+  const [linkDone, setLinkDone] = useState(false);
+  const [linkError, setLinkError] = useState('');
+
   const FASTAPI_URL = "/api/fastapi/register";
   const VERCEL_API_URL = "/api/register";
+
+  const handleLinkSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!lineUserId) return;
+    setLinkLoading(true);
+    setLinkError('');
+    try {
+      const res = await fetch('/api/fastapi/users/link-line', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: linkForm.username, password: linkForm.password, line_user_id: lineUserId }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || err.message || 'เกิดข้อผิดพลาด');
+      }
+      setLinkDone(true);
+    } catch (err: any) {
+      setLinkError(err.message || 'กรุณาลองใหม่ครับ');
+    } finally {
+      setLinkLoading(false);
+    }
+  };
 
   const getRoleId = (roleName: string) => {
     switch (roleName) {
@@ -184,12 +214,18 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
     }
   };
 
-  if (done) return (
+  if (done || linkDone) return (
     <div className="max-w-md mx-auto bg-white p-10 rounded-3xl shadow-xl text-center border border-teal-50 animate-in fade-in zoom-in duration-500">
       <div className="flex justify-center mb-6"><CheckCircle2 className="w-20 h-20 text-teal-500" /></div>
-      <h2 className="text-2xl font-bold mb-2">ลงทะเบียน SafeMind สำเร็จ</h2>
-      <p className="text-slate-500 text-sm mb-8">ข้อมูลของคุณเข้าสู่ระบบเรียบร้อยแล้ว<br />เจ้าหน้าที่จะทำการอนุมัติในไม่ช้าครับ</p>
-      <button onClick={() => window.location.reload()} className="w-full py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition">ปิดหน้าต่างนี้</button>
+      <h2 className="text-2xl font-bold mb-2">
+        {linkDone ? 'เชื่อมต่อ LINE สำเร็จ' : 'ลงทะเบียน SafeMind สำเร็จ'}
+      </h2>
+      <p className="text-slate-500 text-sm mb-8">
+        {linkDone
+          ? 'บัญชีของคุณเชื่อมต่อกับ LINE แล้ว\nรอเจ้าหน้าที่อนุมัติก่อนใช้งานครับ'
+          : <>ข้อมูลของคุณเข้าสู่ระบบเรียบร้อยแล้ว<br />เจ้าหน้าที่จะทำการอนุมัติในไม่ช้าครับ</>}
+      </p>
+      <button onClick={() => liff.closeWindow?.()} className="w-full py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition">ปิดหน้าต่างนี้</button>
     </div>
   );
 
@@ -200,7 +236,54 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
         <p className="text-teal-100 text-sm mt-1">SafeMind: พื้นที่ปลอดภัยเพื่อสุขภาพใจที่ดีของคุณ</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="p-8 space-y-6">
+      {/* Tab switcher */}
+      <div className="flex border-b border-slate-200">
+        <button type="button" onClick={() => setTab('new')}
+          className={`flex-1 py-3 text-sm font-semibold transition-all ${tab === 'new' ? 'border-b-2 border-teal-600 text-teal-600' : 'text-slate-400 hover:text-slate-600'}`}>
+          สมัครใหม่
+        </button>
+        <button type="button" onClick={() => setTab('link')}
+          className={`flex-1 py-3 text-sm font-semibold transition-all ${tab === 'link' ? 'border-b-2 border-teal-600 text-teal-600' : 'text-slate-400 hover:text-slate-600'}`}>
+          มีบัญชีแล้ว
+        </button>
+      </div>
+
+      {/* Tab: มีบัญชีแล้ว */}
+      {tab === 'link' && (
+        <form onSubmit={handleLinkSubmit} className="p-8 space-y-6">
+          <div className={`p-3 rounded-2xl flex items-center gap-3 text-[10px] font-mono border ${lineUserId ? 'bg-teal-50 border-teal-100 text-teal-700' : 'bg-amber-50 border-amber-100 text-amber-700 animate-pulse'}`}>
+            <div className={`w-2 h-2 rounded-full ${lineUserId ? 'bg-teal-500' : 'bg-amber-500'}`} />
+            {lineUserId ? `Verified ID: ${lineUserId.substring(0, 16)}...` : 'Waiting for LINE Authorization...'}
+          </div>
+          <p className="text-sm text-slate-500">กรอก username และ password ที่สมัครไว้ เพื่อผูกบัญชีกับ LINE ของคุณ</p>
+          {linkError && (
+            <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{linkError}</div>
+          )}
+          <div className="space-y-4">
+            <div className="relative">
+              <User className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
+              <input type="text" placeholder="Username *" required
+                className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 outline-none transition"
+                value={linkForm.username}
+                onChange={e => setLinkForm({ ...linkForm, username: e.target.value })} />
+            </div>
+            <div className="relative">
+              <Lock className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
+              <input type="password" placeholder="Password *" required
+                className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-teal-500 outline-none transition"
+                value={linkForm.password}
+                onChange={e => setLinkForm({ ...linkForm, password: e.target.value })} />
+            </div>
+          </div>
+          <button type="submit" disabled={!lineUserId || linkLoading}
+            className={`w-full py-4 rounded-2xl font-extrabold text-white shadow-lg transition-all flex justify-center items-center gap-2 ${lineUserId && !linkLoading ? 'bg-teal-600 hover:bg-teal-700 active:scale-95' : 'bg-slate-300 cursor-not-allowed'}`}>
+            {linkLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'เชื่อมต่อบัญชีกับ LINE'}
+          </button>
+        </form>
+      )}
+
+      {/* Tab: สมัครใหม่ */}
+      {tab === 'new' && <form onSubmit={handleSubmit} className="p-8 space-y-6">
         <div className={`p-3 rounded-2xl flex items-center gap-3 text-[10px] font-mono border transition-all ${lineUserId ? 'bg-teal-50 border-teal-100 text-teal-700' : 'bg-amber-50 border-amber-100 text-amber-700 animate-pulse'}`}>
           <div className={`w-2 h-2 rounded-full ${lineUserId ? 'bg-teal-500' : 'bg-amber-500'}`}></div>
           {lineUserId ? `Verified ID: ${lineUserId.substring(0, 16)}...` : 'Waiting for LINE Authorization...'}
@@ -348,7 +431,7 @@ const RegistrationForm: React.FC<Props> = ({ lineUserId }) => {
         <button type="submit" disabled={!lineUserId || loading} className={`w-full py-4 rounded-2xl font-extrabold text-white shadow-lg transition-all flex justify-center items-center gap-2 ${lineUserId && !loading ? 'bg-teal-600 hover:bg-teal-700 shadow-teal-200 active:scale-95' : 'bg-slate-300 cursor-not-allowed'}`}>
           {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'ยืนยันการลงทะเบียน'}
         </button>
-      </form>
+      </form>}
     </div>
   );
 };
