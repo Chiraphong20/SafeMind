@@ -72,6 +72,16 @@ function App() {
         setLineUserState(state);
 
         if (state === 'active') {
+          // ผูก Rich Menu ใหม่เสมอ (รองรับกรณีเปลี่ยนเครื่อง / ติดตั้ง LINE ใหม่)
+          try {
+            await fetch('/api/change-richmenu-by-line', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ line_user_id: profile.userId }),
+            });
+          } catch {
+            // non-critical — redirect ต่อถึงแม้ล้มเหลว
+          }
           window.location.href = MAIN_APP_URL;
           return;
         }
