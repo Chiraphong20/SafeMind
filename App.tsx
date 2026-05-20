@@ -25,9 +25,26 @@ const PlaceholderPage = ({ title, icon: Icon, color }: any) => (
 
 // --- Component หลัก ---
 
+type LineUserState = 'loading' | 'not_found' | 'pending' | 'active';
+
+const FASTAPI = "/api/fastapi";
+const MAIN_APP_URL = "https://safemind-ai.net";
+
+async function checkLineUser(lineUserId: string): Promise<LineUserState> {
+  try {
+    const res = await fetch(`${FASTAPI}/users/by-line/${lineUserId}`);
+    if (!res.ok) return 'not_found';
+    const user = await res.json();
+    return (user.is_active === true || user.is_active === 1) ? 'active' : 'pending';
+  } catch {
+    return 'not_found';
+  }
+}
+
 function App() {
   const [userId, setUserId] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
+  const [lineUserState, setLineUserState] = useState<LineUserState>('loading');
   // Admin auth gate — seed from sessionStorage so refresh doesn't log out
   const [isAdminAuthed, setIsAdminAuthed] = useState<boolean>(
     () => !!sessionStorage.getItem('admin_token')
@@ -44,16 +61,25 @@ function App() {
         await liff.init({ liffId: "2009105092-WldkRhqH" });
 
         if (!liff.isLoggedIn()) {
-          liff.login(); // ถ้ายังไม่ล็อกอิน ให้เด้งไปล็อกอินก่อน (หน้านี้จะค้างที่ Loading)
-        } else {
-          const profile = await liff.getProfile();
-          setUserId(profile.userId);
+          liff.login();
+          return;
+        }
+
+        const profile = await liff.getProfile();
+        setUserId(profile.userId);
+
+        const state = await checkLineUser(profile.userId);
+        setLineUserState(state);
+
+        if (state === 'active') {
+          window.location.href = MAIN_APP_URL;
+          return;
         }
       } catch (err: any) {
-        console.warn("LIFF Initialization failed (likely localhost or invalid setup). Using Mock User.");
+        console.warn("LIFF Initialization failed. Using Mock User.");
         setUserId("U_mock_local_user_" + Math.floor(Math.random() * 10000));
+        setLineUserState('not_found');
       } finally {
-        // ✅ ไม่ว่าจะสำเร็จหรือพัง ให้ปิดหน้า Loading เสมอเมื่อจบกระบวนการ
         setLoading(false);
       }
     };
@@ -68,14 +94,26 @@ function App() {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center text-teal-600">
         <Loader2 className="w-12 h-12 animate-spin mb-4" />
-        <p className="text-sm font-bold text-slate-400 animate-pulse">กำลังเชื่อมต่อ SafeMind...</p>
+        <p className="text-sm font-bold text-slate-400 animate-pulse">กำลังตรวจสอบบัญชี...</p>
       </div>
     );
   }
 
-  // -------------------------------------------------------
-  // ✅ ส่วนเนื้อหาจริง: จะแสดงก็ต่อเมื่อ loading = false แล้วเท่านั้น
-  // -------------------------------------------------------
+  if (lineUserState === 'pending' && !window.location.pathname.startsWith('/admin')) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <div className="max-w-sm w-full bg-white rounded-2xl shadow-lg p-8 text-center border border-amber-100">
+          <div className="w-16 h-16 rounded-full bg-amber-50 flex items-center justify-center mx-auto mb-4">
+            <ShieldCheck className="w-8 h-8 text-amber-500" />
+          </div>
+          <h3 className="font-bold text-slate-700 text-lg mb-2">รอการอนุมัติ</h3>
+          <p className="text-sm text-slate-500 mb-6">บัญชีของคุณอยู่ระหว่างการตรวจสอบ<br />เจ้าหน้าที่จะอนุมัติในไม่ช้าครับ</p>
+          <p className="text-xs text-slate-400 font-mono bg-slate-50 rounded-xl px-3 py-2 break-all">LINE ID: {userId.substring(0, 20)}...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Router>
       <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
