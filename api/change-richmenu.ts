@@ -31,17 +31,37 @@ export default async function handler(req: any, res: any) {
       return res.status(200).json({ success: true, message: 'No LINE user ID, skipped' });
     }
 
-    // 3. Assign Rich Menu
+    // 3. Assign Rich Menu + Push Message
     const lineToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
     if (!lineToken) {
       return res.status(500).json({ error: 'LINE_CHANNEL_ACCESS_TOKEN not configured' });
     }
 
-    await axios.post(
-      `https://api.line.me/v2/bot/user/${lineUserId}/richmenu/${RICHMENU_ID}`,
-      {},
-      { headers: { Authorization: `Bearer ${lineToken}` } }
-    );
+    const lineHeaders = { Authorization: `Bearer ${lineToken}`, 'Content-Type': 'application/json' };
+    const fullName = userRes.data.full_name || 'คุณ';
+
+    await Promise.all([
+      // เปลี่ยน Rich Menu
+      axios.post(
+        `https://api.line.me/v2/bot/user/${lineUserId}/richmenu/${RICHMENU_ID}`,
+        {},
+        { headers: lineHeaders }
+      ),
+      // Push Message แจ้งอนุมัติ
+      axios.post(
+        'https://api.line.me/v2/bot/message/push',
+        {
+          to: lineUserId,
+          messages: [
+            {
+              type: 'text',
+              text: `✅ บัญชีของ${fullName} ได้รับการอนุมัติแล้วครับ\n\nสามารถใช้งาน SafeMind ได้เลย กดเมนูด้านล่างเพื่อเริ่มต้นใช้งานครับ 🙏`,
+            },
+          ],
+        },
+        { headers: lineHeaders }
+      ),
+    ]);
 
     return res.status(200).json({ success: true, line_user_id: lineUserId });
   } catch (err: any) {
