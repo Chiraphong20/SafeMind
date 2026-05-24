@@ -1,27 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import liff from '@line/liff';
-import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import RegistrationForm from './components/RegistrationForm';
 import Approve from './components/Approve';
 import AdminLogin from './components/AdminLogin';
 import SmiVTable from './components/SmiVTable';
 import SpotMap from './components/SpotMap';
 import AppointmentPage from './components/AppointmentPage';
-import { LayoutDashboard, UserPlus, ShieldCheck, MapPin, FileText, Calendar, Video, Loader2 } from 'lucide-react';
-
-// --- Components ย่อย ---
-
-
-
-const PlaceholderPage = ({ title, icon: Icon, color }: any) => (
-  <div className={`min-h-[60vh] flex flex-col items-center justify-center ${color} rounded-2xl border-2 border-dashed m-4 animate-in fade-in duration-500`}>
-    <div className="bg-white p-4 rounded-full shadow-sm mb-4">
-      <Icon size={40} className="opacity-80" />
-    </div>
-    <h1 className="text-2xl font-bold">{title}</h1>
-    <p className="text-slate-500 mt-2 text-sm">ระบบกำลังพัฒนา...</p>
-  </div>
-);
+import { ShieldCheck, Loader2 } from 'lucide-react';
+import ExternalRedirect from './components/ExternalRedirect';
 
 // --- Component หลัก ---
 
@@ -158,11 +145,11 @@ function App() {
                 {/* หน้าอื่นๆ */}
                 <Route path="/smiv" element={<SmiVTable />} />
                 <Route path="/appointments" element={<AppointmentPage />} />
-                <Route path="/pin" element={<PlaceholderPage title="ปักหมุดเยี่ยมบ้าน" icon={MapPin} color="bg-green-50 text-green-700 border-green-200" />} />
-                <Route path="/save" element={<PlaceholderPage title="บันทึกข้อมูล" icon={FileText} color="bg-blue-50 text-blue-700 border-blue-200" />} />
-                <Route path="/check" element={<PlaceholderPage title="ตรวจสอบผู้ป่วย" icon={ShieldCheck} color="bg-green-50 text-green-700 border-green-200" />} />
-                <Route path="/calendar" element={<PlaceholderPage title="ตารางคลินิก" icon={Calendar} color="bg-blue-50 text-blue-700 border-blue-200" />} />
-                <Route path="/tele" element={<PlaceholderPage title="ส่งคำขอเทเล" icon={Video} color="bg-green-50 text-green-700 border-green-200" />} />
+                <Route path="/pin" element={<ExternalRedirect lineUserId={userId} targetPath="pin" />} />
+                <Route path="/save" element={<ExternalRedirect lineUserId={userId} targetPath="save" />} />
+                <Route path="/check" element={<ExternalRedirect lineUserId={userId} targetPath="check" />} />
+                <Route path="/calendar" element={<ExternalRedirect lineUserId={userId} targetPath="calendar" />} />
+                <Route path="/tele" element={<ExternalRedirect lineUserId={userId} targetPath="tele" />} />
               </Routes>
             </main>
           } />
