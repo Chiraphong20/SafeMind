@@ -8,11 +8,11 @@ interface ExternalRedirectProps {
 
 // target path → URL หน้าปลายทางใน sm_FontEnd
 const TARGET_MAP: Record<string, string> = {
-  pin:      '/spotmap',
+  pin:      '/visit/new',
   save:     '/visit/new',
   check:    '/patients',
   calendar: '/clinic',
-  tele:     '/telehealth/pcu',
+  tele:     '/telehealth-auto',
 };
 
 const SM_BASE = 'https://goldfish-tricycle-cartel.ngrok-free.dev';
