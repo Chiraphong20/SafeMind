@@ -15,7 +15,7 @@ const TARGET_MAP: Record<string, string> = {
   tele:     '/telehealth/pcu',
 };
 
-const SM_BASE = 'https://safemind-ai.net:8080';
+const SM_BASE = 'https://goldfish-tricycle-cartel.ngrok-free.dev';
 
 export default function ExternalRedirect({ lineUserId, targetPath }: ExternalRedirectProps) {
   useEffect(() => {
