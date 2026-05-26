@@ -8,14 +8,14 @@ interface ExternalRedirectProps {
 
 // target path → URL หน้าปลายทางใน sm_FontEnd
 const TARGET_MAP: Record<string, string> = {
-  pin:      '/visit/new',
+  pin:      '/pin',
   save:     '/visit/new',
   check:    '/patients',
   calendar: '/clinic',
   tele:     '/telehealth-auto',
 };
 
-const SM_BASE = 'https://goldfish-tricycle-cartel.ngrok-free.dev';
+const SM_BASE = 'https://safemind-ai.net:8080';
 
 export default function ExternalRedirect({ lineUserId, targetPath }: ExternalRedirectProps) {
   useEffect(() => {
