@@ -1,9 +1,9 @@
 import axios from 'axios';
 
 const FASTAPI_BASE = "http://210.246.215.95:8000";
+const FRONTEND_BASE = "https://safemind-ai.net";
 
 // tmbpart → health_center_ids ที่ดูแลพื้นที่นั้น
-// addressid format: 3021{tmbpart} → tmbpart = last 2 chars
 const HEALTH_CENTERS: { id: number; tmbpart: string; name: string }[] = [
   { id: 1,  tmbpart: "01", name: "รพ.สต.หนองมะค่า" },
   { id: 2,  tmbpart: "02", name: "รพ.สต.กลางดง" },
@@ -67,63 +67,50 @@ export default async function handler(req: any, res: any) {
     const machineToken = tokenRes.data.access_token;
     const apiHeaders = { 'Authorization': `Bearer ${machineToken}` };
 
-    // Group patients by tmbpart
-    const areaBuckets: Record<string, PatientAlert[]> = {};
-    for (const p of patients) {
-      const tmb = p.tmbpart ?? "00";
-      if (!areaBuckets[tmb]) areaBuckets[tmb] = [];
-      areaBuckets[tmb].push(p);
-    }
+    // Cache staff by tmbpart to avoid redundant API calls
+    const staffCache = new Map<string, { line_user_id: string; full_name: string }[]>();
 
-    let totalSent = 0;
-    const results: { tmbpart: string; recipients: number; patients: number }[] = [];
+    const getStaffForArea = async (tmbpart: string) => {
+      if (staffCache.has(tmbpart)) return staffCache.get(tmbpart)!;
 
-    for (const [tmbpart, localPatients] of Object.entries(areaBuckets)) {
-      // Find health_center_ids that cover this tmbpart
       const hcIds = HEALTH_CENTERS.filter(hc => hc.tmbpart === tmbpart).map(hc => hc.id);
       if (hcIds.length === 0) {
-        console.log(`No health centers configured for tmbpart ${tmbpart}`);
-        continue;
+        staffCache.set(tmbpart, []);
+        return [];
       }
 
-      // Fetch รพ.สต. staff with line_user_id and matching health_center_id
-      // Try both role_id=6 (HOSPITAL) and role_id=3 (PUKKONG) for รพ.สต. staff
-      const staffByHcId = await Promise.all(
+      const staffByHc = await Promise.all(
         hcIds.map(hcId =>
           axios.get(`${FASTAPI_BASE}/users`, {
             headers: apiHeaders,
-            params: { health_center_id: hcId, is_active: true, limit: 100 }
+            params: { health_center_id: hcId, is_active: true, limit: 100 },
           }).then(r => r.data.items ?? []).catch(() => [])
         )
       );
-      const allStaff = staffByHcId.flat().filter((u: any) => u.line_user_id);
-      // Deduplicate
-      const seenIds = new Set<string>();
-      const staff = allStaff.filter((u: any) => {
-        if (seenIds.has(u.line_user_id)) return false;
-        seenIds.add(u.line_user_id);
+
+      const allStaff = staffByHc.flat().filter((u: any) => u.line_user_id);
+      const seen = new Set<string>();
+      const deduped = allStaff.filter((u: any) => {
+        if (seen.has(u.line_user_id)) return false;
+        seen.add(u.line_user_id);
         return true;
       });
 
-      if (staff.length === 0) {
-        console.log(`No รพ.สต. staff with LINE for tmbpart ${tmbpart}`);
-        continue;
-      }
+      staffCache.set(tmbpart, deduped);
+      return deduped;
+    };
 
-      // Compose message
-      const hcNames = [...new Set(HEALTH_CENTERS.filter(hc => hc.tmbpart === tmbpart).map(hc => hc.name))].join(", ");
-      const today = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
-      const patientLines = localPatients.map((p, i) =>
-        `${i + 1}. ${p.pt_name} (HN: ${p.hn})${p.moopart ? ` หมู่ ${p.moopart}` : ''}${p.nextdate ? ` — นัด ${p.nextdate}` : ''}`
-      ).join('\n');
+    let totalSent = 0;
 
+    // Send one LINE message per patient per staff member in their area
+    for (const patient of patients) {
+      const tmbpart = patient.tmbpart ?? "00";
+      const staff = await getStaffForArea(tmbpart);
+      if (staff.length === 0) continue;
+
+      const followUpLink = `${FRONTEND_BASE}/patients/${patient.hn}`;
       const messageText =
-        `⚠️ แจ้งเตือน: ผู้ป่วยขาดนัด + ยังไม่ได้เยี่ยมบ้าน\n` +
-        `📍 พื้นที่: ${hcNames}\n` +
-        `📅 วันที่: ${today}\n` +
-        `👥 จำนวน ${localPatients.length} ราย\n\n` +
-        `${patientLines}\n\n` +
-        `กรุณาติดตามเยี่ยมบ้านและบันทึกข้อมูลการเยี่ยมในระบบด้วยครับ/ค่ะ`;
+        `${patient.pt_name} ผู้ป่วย SMIV ในความดูแลของท่าน ขาดนัดติดตามที่คลินิกจิตเวชเกิน 1 สัปดาห์ โปรดดำเนินการติดตามผู้ป่วยผ่านลิงก์นี้: ${followUpLink}`;
 
       for (const member of staff) {
         try {
@@ -131,24 +118,21 @@ export default async function handler(req: any, res: any) {
             'https://api.line.me/v2/bot/message/push',
             {
               to: member.line_user_id,
-              messages: [{ type: 'text', text: `สวัสดี ${member.full_name}\n\n${messageText}` }]
+              messages: [{ type: 'text', text: messageText }],
             },
             { headers: lineHeaders }
           );
           totalSent++;
         } catch (err: any) {
-          console.error(`Failed LINE push to ${member.full_name}:`, err.response?.data || err.message);
+          console.error(`Failed LINE push to ${member.full_name} for patient ${patient.hn}:`, err.response?.data || err.message);
         }
       }
-
-      results.push({ tmbpart, recipients: staff.length, patients: localPatients.length });
     }
 
     return res.status(200).json({
       success: true,
-      message: 'Dispatched to รพ.สต.',
+      message: 'ส่งแจ้งเตือนเรียบร้อย',
       push_count: totalSent,
-      areas: results,
     });
 
   } catch (error: any) {
