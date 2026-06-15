@@ -69,8 +69,12 @@ function App() {
           } catch {
             // non-critical — redirect ต่อถึงแม้ล้มเหลว
           }
-          window.location.href = MAIN_APP_URL;
-          return;
+          // redirect ไป main app เฉพาะหน้าแรก ถ้าเป็นปุ่มเมนู (/pin, /save ฯลฯ) ให้ ExternalRedirect จัดการ
+          const menuPaths = ['/pin', '/save', '/check', '/calendar', '/tele'];
+          if (!menuPaths.includes(window.location.pathname)) {
+            window.location.href = MAIN_APP_URL;
+            return;
+          }
         }
       } catch (err: any) {
         console.warn("LIFF Initialization failed. Using Mock User.");
