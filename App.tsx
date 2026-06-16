@@ -70,7 +70,7 @@ function App() {
             // non-critical — redirect ต่อถึงแม้ล้มเหลว
           }
           // redirect ไป main app เฉพาะหน้าแรก ถ้าเป็นปุ่มเมนู (/pin, /save ฯลฯ) ให้ ExternalRedirect จัดการ
-          const menuPaths = ['/pin', '/save', '/check', '/calendar', '/tele'];
+          const menuPaths = ['/pin', '/save', '/check', '/calendar', '/tele', '/login'];
           if (!menuPaths.includes(window.location.pathname)) {
             window.location.href = MAIN_APP_URL;
             return;
@@ -144,7 +144,11 @@ function App() {
                 {/* หน้าแรก / Register */}
                 <Route path="/" element={<RegistrationForm lineUserId={userId} />} />
                 <Route path="/register" element={<RegistrationForm lineUserId={userId} />} />
-                <Route path="/login" element={<RegistrationForm lineUserId={userId} />} />
+                <Route path="/login" element={
+                  lineUserState === 'active'
+                    ? <ExternalRedirect lineUserId={userId} targetPath="login" />
+                    : <RegistrationForm lineUserId={userId} />
+                } />
 
                 {/* หน้าอื่นๆ */}
                 <Route path="/smiv" element={<SmiVTable />} />
