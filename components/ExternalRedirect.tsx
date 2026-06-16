@@ -8,7 +8,7 @@ interface ExternalRedirectProps {
 
 // target path → URL หน้าปลายทางใน sm_FontEnd
 const TARGET_MAP: Record<string, string> = {
-  pin:      '/pin',
+  pin:      '/smiv-dashboard',
   save:     '/visit/new',
   check:    '/patients',
   calendar: '/clinic',
