@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const FASTAPI = "http://210.246.215.95:8000";
-const RICHMENU_ID = 'richmenu-794d774ad8ceb72a578744bc6174616c';
+const RICHMENU_ID = 'richmenu-9301eee1e28d459a6e99e5ec5f45af9e';
 
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', '*');
