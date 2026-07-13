@@ -398,7 +398,7 @@ export default async function handler(req: any, res: any) {
         // ถ้า user ลงทะเบียนแล้ว → สลับ Rich Menu เป็น Menu 2 ทันที
         // (block/unblock จะรีเซ็ต Rich Menu กลับเป็น default เสมอ)
         if (user && lineUserId) {
-          const RICHMENU_2_ID = 'richmenu-9301eee1e28d459a6e99e5ec5f45af9e';
+          const RICHMENU_2_ID = 'richmenu-3136d2491e5d67749d9956b2d20a0454';
           await axios.post(
             `https://api.line.me/v2/bot/user/${lineUserId}/richmenu/${RICHMENU_2_ID}`,
             {},
