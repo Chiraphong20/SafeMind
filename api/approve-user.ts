@@ -52,7 +52,7 @@ export default async function handler(req: any, res: any) {
     // 5. Update LINE Rich Menu (best-effort)
     const lineToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
     if (lineToken && targetLineUserId) {
-      const richMenuId = 'richmenu-3136d2491e5d67749d9956b2d20a0454';
+      const richMenuId = 'richmenu-78f2241931e8e68d20e2a5722c98a057';
       try {
         await axios.post(
           `https://api.line.me/v2/bot/user/${targetLineUserId}/richmenu/${richMenuId}`,

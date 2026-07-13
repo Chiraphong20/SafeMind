@@ -70,7 +70,7 @@ function App() {
             // non-critical — redirect ต่อถึงแม้ล้มเหลว
           }
           // redirect ไป main app เฉพาะหน้าแรก ถ้าเป็นปุ่มเมนู (/pin, /save ฯลฯ) ให้ ExternalRedirect จัดการ
-          const menuPaths = ['/pin', '/save', '/check', '/calendar', '/tele', '/login'];
+          const menuPaths = ['/pin', '/save', '/check', '/calendar', '/tele', '/login', '/report'];
           if (!menuPaths.includes(window.location.pathname)) {
             window.location.href = MAIN_APP_URL;
             return;
@@ -158,6 +158,7 @@ function App() {
                 <Route path="/check" element={<ExternalRedirect lineUserId={userId} targetPath="check" />} />
                 <Route path="/calendar" element={<ExternalRedirect lineUserId={userId} targetPath="calendar" />} />
                 <Route path="/tele" element={<ExternalRedirect lineUserId={userId} targetPath="tele" />} />
+                <Route path="/report" element={<ExternalRedirect lineUserId={userId} targetPath="report" />} />
               </Routes>
             </main>
           } />

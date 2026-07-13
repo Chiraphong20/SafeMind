@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const RICHMENU_ID = 'richmenu-3136d2491e5d67749d9956b2d20a0454';
+const RICHMENU_ID = 'richmenu-78f2241931e8e68d20e2a5722c98a057';
 
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', '*');

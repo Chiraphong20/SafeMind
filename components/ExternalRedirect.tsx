@@ -14,6 +14,7 @@ const TARGET_MAP: Record<string, string> = {
   check:    '/patients',
   calendar: '/clinic',
   tele:     '/telehealth-auto',
+  report:   '/patient-report-error',
 };
 
 const SM_BASE = 'https://safemind-ai.net:8080';
