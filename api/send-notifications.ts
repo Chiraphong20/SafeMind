@@ -242,11 +242,19 @@ export default async function handler(req: any, res: any) {
     const usersRes = await axios.get(`${FASTAPI}/users?role_id=${ROLE_VHV}&limit=500`, { headers: authHeader });
     const allUsers: any[] = Array.isArray(usersRes.data) ? usersRes.data : (usersRes.data.items ?? []);
     const isRealLineId = (id: string) =>
-      typeof id === 'string' && id.startsWith('U') && id.length >= 20 && !id.startsWith('UNLINKED');
+      typeof id === 'string' && id.length >= 5 && !id.startsWith('UNLINKED');
     const vhvUsers = allUsers.filter((u: any) => u.line_user_id && u.is_active && isRealLineId(u.line_user_id));
 
     if (vhvUsers.length === 0) {
-      return res.status(200).json({ success: true, message: 'No active VHV users with LINE' });
+      return res.status(200).json({
+        success: true,
+        message: 'No active VHV users with LINE',
+        debug_all_vhv: allUsers.slice(0, 15).map((u: any) => ({
+          name: u.full_name ?? u.username,
+          is_active: u.is_active,
+          line_user_id: u.line_user_id,
+        })),
+      });
     }
 
     // 2. ดึง High Risk patients
