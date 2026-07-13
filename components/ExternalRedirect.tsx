@@ -11,7 +11,7 @@ const TARGET_MAP: Record<string, string> = {
   login:    '/dashboard',
   pin:      '/smiv-dashboard',
   save:     '/visit/new',
-  check:    '/patients',
+  check:    '/patient-check/record',
   calendar: '/clinic',
   tele:     '/telehealth-auto',
   report:   '/patient-report-error',
