@@ -24,7 +24,7 @@ async function getMachineToken(): Promise<string> {
 
 function isHighOrSevere(smiv: string | null | undefined): boolean {
   const t = String(smiv ?? '').toLowerCase();
-  return t.includes('high') || t.includes('severe') || t.includes('สูง') || t.includes('รุนแรง');
+  return t.includes('สีแดง') || t.includes('high') || t.includes('severe') || t.includes('สูง') || t.includes('รุนแรง');
 }
 
 function daysSince(dateStr: string | null | undefined): number | null {
@@ -230,6 +230,7 @@ export default async function handler(req: any, res: any) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
+  const isDebug = req.body?.debug === true;
   const lineToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
   if (!lineToken) return res.status(500).json({ error: 'LINE_CHANNEL_ACCESS_TOKEN not set' });
 
@@ -259,12 +260,37 @@ export default async function handler(req: any, res: any) {
     });
 
     // 3. ดึง Missed Appointment patients (90 วันย้อนหลัง)
+    const MISSED_BASE = process.env.MISSED_APPT_BASE_URL ?? 'http://58.64.14.151/api/v2/public/index.php/api/v1';
+    const MISSED_KEY  = process.env.MISSED_APPT_API_KEY ?? '';
+    const missedHeaders = MISSED_KEY ? { Authorization: `Bearer ${MISSED_KEY}` } : {};
     const fromDate = new Date(); fromDate.setDate(fromDate.getDate() - 90);
     const missedRes = await axios.get(
-      `${FASTAPI}/missed-appointments?nextdate_from=${toIsoDate(fromDate)}&nextdate_to=${toIsoDate(new Date())}&limit=${PAGE}`,
-      { headers: authHeader }
+      `${MISSED_BASE}/missed_appointment?nextdate_from=${toIsoDate(fromDate)}&nextdate_to=${toIsoDate(new Date())}&per_page=${PAGE}&page=1`,
+      { headers: missedHeaders }
     ).catch(() => null);
-    const missedPatients: any[] = missedRes?.data?.items ?? (Array.isArray(missedRes?.data) ? missedRes?.data : []);
+    const missedRaw = missedRes?.data;
+    const missedPatients: any[] = Array.isArray(missedRaw)
+      ? missedRaw
+      : (missedRaw?.data ?? missedRaw?.items ?? []);
+
+    if (isDebug) {
+      return res.status(200).json({
+        debug: true,
+        vhv_count: vhvUsers.length,
+        vhv_sample: vhvUsers.slice(0, 3).map((u: any) => ({
+          name: u.full_name, line_user_id: !!u.line_user_id, moopart: u.moopart, tmbpart: u.tmbpart,
+        })),
+        total_vpatients: allVPatients.length,
+        high_risk_count: highRiskPatients.length,
+        high_risk_sample: highRiskPatients.slice(0, 3).map((p: any) => ({
+          hn: p.hn, name: p.pt_name, smiv: p.smiv_result, moopart: p.moopart, tmbpart: p.tmbpart,
+        })),
+        missed_count: missedPatients.length,
+        missed_api_status: missedRes?.status ?? 'failed',
+        missed_sample: missedPatients.slice(0, 2).map((p: any) => ({ hn: p.hn, name: p.patient_name, moopart: p.moopart, days: p.missed_days })),
+        vpatient_smiv_values: [...new Set(allVPatients.slice(0, 50).map((p: any) => p.smiv_result))],
+      });
+    }
 
     // 4. ส่ง notification ทีละ VHV
     const lineHeaders = { Authorization: `Bearer ${lineToken}`, 'Content-Type': 'application/json' };
@@ -275,12 +301,16 @@ export default async function handler(req: any, res: any) {
       const vhvMoo: string | null = vhv.moopart ?? null;
       const vhvTmb: string | null = vhv.tmbpart ?? null;
 
-      // กรอง patients ตาม moopart/tmbpart ของ VHV (ถ้าไม่มี moopart → ส่งทุกเคส)
-      const myHighRisk = vhvMoo
-        ? highRiskPatients.filter((p: any) => p.moopart === vhvMoo && (!vhvTmb || p.tmbpart === vhvTmb))
+      // กรอง patients ตาม moopart/tmbpart ของ VHV (trim spaces ก่อน compare)
+      // test=true → ส่งทุกเคสให้ทุก VHV (ใช้ทดสอบ)
+      const isTest = req.body?.test === true;
+      const moo = vhvMoo?.trim() ?? null;
+      const tmb = vhvTmb?.trim() ?? null;
+      const myHighRisk = (moo && !isTest)
+        ? highRiskPatients.filter((p: any) => p.moopart?.trim() === moo && (!tmb || p.tmbpart?.trim() === tmb))
         : highRiskPatients;
-      const myMissed = vhvMoo
-        ? missedPatients.filter((p: any) => p.moopart === vhvMoo && (!vhvTmb || p.tmbpart === vhvTmb))
+      const myMissed = (moo && !isTest)
+        ? missedPatients.filter((p: any) => p.moopart?.trim() === moo && (!tmb || p.tmbpart?.trim() === tmb))
         : missedPatients;
 
       if (myHighRisk.length === 0 && myMissed.length === 0) continue;
