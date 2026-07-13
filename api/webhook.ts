@@ -376,7 +376,7 @@ export default async function handler(req: any, res: any) {
         continue;
       }
 
-      // Handle the "follow" event — personalized greeting
+      // Handle the "follow" event — personalized greeting + auto switch Rich Menu
       if (event.type === 'follow') {
         const lineUserId: string = event.source?.userId;
         const replyToken: string = event.replyToken;
@@ -388,11 +388,23 @@ export default async function handler(req: any, res: any) {
           ? buildWelcomeFlex(user.full_name, user.health_center_name)
           : buildRegisterFlex();
 
+        // ส่ง Flex ทักทายกลับ
         await axios.post(
           'https://api.line.me/v2/bot/message/reply',
           { replyToken, messages: [flexMessage] },
           { headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${lineToken}` } }
         );
+
+        // ถ้า user ลงทะเบียนแล้ว → สลับ Rich Menu เป็น Menu 2 ทันที
+        // (block/unblock จะรีเซ็ต Rich Menu กลับเป็น default เสมอ)
+        if (user && lineUserId) {
+          const RICHMENU_2_ID = 'richmenu-9301eee1e28d459a6e99e5ec5f45af9e';
+          await axios.post(
+            `https://api.line.me/v2/bot/user/${lineUserId}/richmenu/${RICHMENU_2_ID}`,
+            {},
+            { headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${lineToken}` } }
+          ).catch(() => { /* non-critical */ });
+        }
       }
     }
 
