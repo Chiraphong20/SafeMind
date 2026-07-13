@@ -238,21 +238,27 @@ export default async function handler(req: any, res: any) {
     const token = await getMachineToken();
     const authHeader = { Authorization: `Bearer ${token}` };
 
-    // 1. ดึง VHV users ที่มี line_user_id
-    const usersRes = await axios.get(`${FASTAPI}/users?role_id=${ROLE_VHV}&limit=500`, { headers: authHeader });
+    // 1. ดึง users ทุก role ที่มี line_user_id จริง (VHV = role 5, แต่ดึงทุก role ก่อนกรอง)
+    const usersRes = await axios.get(`${FASTAPI}/users?limit=500`, { headers: authHeader });
     const allUsers: any[] = Array.isArray(usersRes.data) ? usersRes.data : (usersRes.data.items ?? []);
     const isRealLineId = (id: string) =>
-      typeof id === 'string' && id.length >= 5 && !id.startsWith('UNLINKED');
-    const vhvUsers = allUsers.filter((u: any) => u.line_user_id && u.is_active && isRealLineId(u.line_user_id));
+      typeof id === 'string' && id.length >= 10 && !id.startsWith('UNLINKED');
+    // กรองเฉพาะ VHV (role_id=5) ที่มี LINE จริง
+    const vhvUsers = allUsers.filter((u: any) =>
+      u.line_user_id && u.is_active && isRealLineId(u.line_user_id) && u.role_id === ROLE_VHV
+    );
 
     if (vhvUsers.length === 0) {
+      const withRealLine = allUsers.filter((u: any) => u.line_user_id && isRealLineId(u.line_user_id));
       return res.status(200).json({
         success: true,
         message: 'No active VHV users with LINE',
-        debug_all_vhv: allUsers.slice(0, 15).map((u: any) => ({
+        total_users: allUsers.length,
+        users_with_real_line: withRealLine.map((u: any) => ({
           name: u.full_name ?? u.username,
+          role_id: u.role_id,
           is_active: u.is_active,
-          line_user_id: u.line_user_id,
+          line_user_id: u.line_user_id?.slice(0, 8) + '...',
         })),
       });
     }

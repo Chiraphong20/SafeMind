@@ -125,9 +125,10 @@ export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return res.status(405).end();
 
   try {
-    const { patients, type } = req.body as {
+    const { patients, type, target_role } = req.body as {
       patients: SmivPatient[];
       type: 'high-risk' | 'missed-appointment';
+      target_role?: number;
     };
 
     if (!patients || !Array.isArray(patients) || patients.length === 0) {
@@ -136,6 +137,7 @@ export default async function handler(req: any, res: any) {
     if (type !== 'high-risk' && type !== 'missed-appointment') {
       return res.status(400).json({ message: 'type must be high-risk or missed-appointment' });
     }
+    const roleFilter = target_role ?? 5;
 
     const lineToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
     if (!lineToken) return res.status(500).json({ error: 'LINE_CHANNEL_ACCESS_TOKEN not configured' });
@@ -149,10 +151,26 @@ export default async function handler(req: any, res: any) {
     );
     const apiHeaders = { 'Authorization': `Bearer ${tokenRes.data.access_token}` };
 
-    // Group by tmbpart
+    // Fetch ALL users, filter client-side (API doesn't support role_id/tmbpart query params)
+    const usersRes = await axios.get(`${FASTAPI_BASE}/users`, {
+      headers: apiHeaders,
+      params: { limit: 500 }
+    });
+    const rawUsers: any[] = Array.isArray(usersRes.data)
+      ? usersRes.data
+      : (usersRes.data?.items ?? []);
+
+    const isRealLineId = (id: string) =>
+      typeof id === 'string' && id.length >= 10 && !id.startsWith('UNLINKED');
+
+    const vhvAll = rawUsers.filter((u: any) =>
+      u.role_id === roleFilter && u.is_active && u.line_user_id && isRealLineId(u.line_user_id)
+    );
+
+    // Group patients by tmbpart
     const buckets: Record<string, SmivPatient[]> = {};
     for (const p of patients) {
-      const key = p.tmbpart || '__no_area__';
+      const key = (p.tmbpart ?? '').trim() || '__no_area__';
       if (!buckets[key]) buckets[key] = [];
       buckets[key].push(p);
     }
@@ -163,17 +181,11 @@ export default async function handler(req: any, res: any) {
     for (const [tmbpart, group] of Object.entries(buckets)) {
       if (tmbpart === '__no_area__') continue;
 
-      // Find VHVs (role_id=5) in this subdistrict
-      const usersRes = await axios.get(`${FASTAPI_BASE}/users`, {
-        headers: apiHeaders,
-        params: { role_id: 5, is_active: true, tmbpart, limit: 100 }
-      });
-      const allVhvs: any[] = (usersRes.data.items || []).filter((u: any) => u.line_user_id);
-      const seen = new Set<string>();
-      const vhvs = allVhvs.filter((u: any) => {
-        if (seen.has(u.line_user_id)) return false;
-        seen.add(u.line_user_id);
-        return true;
+      // Match recipients: if user has no tmbpart (e.g. รพ.สต. role) → send to all
+      // if user has tmbpart → must match patient's tmbpart
+      const vhvs = vhvAll.filter((u: any) => {
+        const uTmb = (u.tmbpart ?? '').trim();
+        return uTmb === '' || uTmb === tmbpart;
       });
       if (vhvs.length === 0) continue;
 
@@ -198,13 +210,28 @@ export default async function handler(req: any, res: any) {
             );
             totalSent++;
           } catch (err: any) {
-            console.error(`Failed pushing to ${vhv.full_name}:`, err.response?.data || err.message);
+            console.error(`Push failed → ${vhv.full_name}:`, err.response?.data || err.message);
           }
         }
       }
     }
 
-    return res.status(200).json({ success: true, push_count: totalSent });
+    // Build debug: which tmbparts had VHVs vs patients
+    const vhvTmbs = [...new Set(vhvAll.map((u: any) => (u.tmbpart ?? '').trim()))].sort();
+    const patTmbs = [...new Set(patients.map((p: any) => (p.tmbpart ?? '').trim()))].sort();
+    const matched = patTmbs.filter(t => t && vhvTmbs.includes(t));
+
+    return res.status(200).json({
+      success: true,
+      push_count: totalSent,
+      debug: {
+        vhv_with_line: vhvAll.length,
+        patient_count: patients.length,
+        vhv_tmbparts: vhvTmbs,
+        patient_tmbparts: patTmbs,
+        matched_tmbparts: matched,
+      },
+    });
   } catch (error: any) {
     console.error('notify-smiv error:', error);
     return res.status(500).json({ error: 'Internal Server Error', details: error.message });
