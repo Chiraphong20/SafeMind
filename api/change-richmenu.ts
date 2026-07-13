@@ -40,30 +40,35 @@ export default async function handler(req: any, res: any) {
     const lineHeaders = { Authorization: `Bearer ${lineToken}`, 'Content-Type': 'application/json' };
     const fullName = userRes.data.full_name || 'คุณ';
 
-    await Promise.all([
-      // เปลี่ยน Rich Menu
-      axios.post(
-        `https://api.line.me/v2/bot/user/${lineUserId}/richmenu/${RICHMENU_ID}`,
-        {},
-        { headers: lineHeaders }
-      ),
-      // Push Message แจ้งอนุมัติ
-      axios.post(
-        'https://api.line.me/v2/bot/message/push',
-        {
-          to: lineUserId,
-          messages: [
-            {
-              type: 'text',
-              text: `✅ บัญชีของ${fullName} ได้รับการอนุมัติแล้วครับ\n\nสามารถใช้งาน SafeMind ได้เลย กดเมนูด้านล่างเพื่อเริ่มต้นใช้งานครับ 🙏`,
-            },
-          ],
-        },
-        { headers: lineHeaders }
-      ),
-    ]);
+    // Rich Menu — best-effort
+    const rmResult = await axios.post(
+      `https://api.line.me/v2/bot/user/${lineUserId}/richmenu/${RICHMENU_ID}`,
+      {},
+      { headers: lineHeaders }
+    ).then(() => 'ok').catch((e: any) => {
+      console.warn('Rich Menu assign failed:', e.response?.data || e.message);
+      return 'skipped';
+    });
 
-    return res.status(200).json({ success: true, line_user_id: lineUserId });
+    // Push Message — best-effort (อาจล้มเหลวถ้า user block bot)
+    const pushResult = await axios.post(
+      'https://api.line.me/v2/bot/message/push',
+      {
+        to: lineUserId,
+        messages: [
+          {
+            type: 'text',
+            text: `✅ บัญชีของ${fullName} ได้รับการอนุมัติแล้วครับ\n\nสามารถใช้งาน SafeMind ได้เลย กดเมนูด้านล่างเพื่อเริ่มต้นใช้งานครับ 🙏`,
+          },
+        ],
+      },
+      { headers: lineHeaders }
+    ).then(() => 'ok').catch((e: any) => {
+      console.warn('Push message failed:', e.response?.data || e.message);
+      return 'skipped';
+    });
+
+    return res.status(200).json({ success: true, line_user_id: lineUserId, richmenu: rmResult, push: pushResult });
   } catch (err: any) {
     console.error('change-richmenu error:', err.response?.data || err.message);
     return res.status(500).json({
