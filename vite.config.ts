@@ -12,6 +12,10 @@ export default defineConfig({
         target: 'http://210.246.215.95:8000',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/fastapi/, '')
+      },
+      '/api': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
       }
     }
   }
