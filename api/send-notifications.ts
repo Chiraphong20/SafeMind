@@ -241,7 +241,9 @@ export default async function handler(req: any, res: any) {
     // 1. ดึง VHV users ที่มี line_user_id
     const usersRes = await axios.get(`${FASTAPI}/users?role_id=${ROLE_VHV}&limit=500`, { headers: authHeader });
     const allUsers: any[] = Array.isArray(usersRes.data) ? usersRes.data : (usersRes.data.items ?? []);
-    const vhvUsers = allUsers.filter((u: any) => u.line_user_id && u.is_active);
+    const isRealLineId = (id: string) =>
+      typeof id === 'string' && id.startsWith('U') && id.length >= 20 && !id.startsWith('UNLINKED');
+    const vhvUsers = allUsers.filter((u: any) => u.line_user_id && u.is_active && isRealLineId(u.line_user_id));
 
     if (vhvUsers.length === 0) {
       return res.status(200).json({ success: true, message: 'No active VHV users with LINE' });
