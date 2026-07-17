@@ -11,8 +11,6 @@ import AppointmentPage from './components/AppointmentPage';
 import { ShieldCheck, Loader2 } from 'lucide-react';
 import ExternalRedirect from './components/ExternalRedirect';
 
-const PDPA_KEY = 'pdpa_accepted_v1';
-
 // --- Component หลัก ---
 
 type LineUserState = 'loading' | 'not_found' | 'pending' | 'active';
@@ -35,9 +33,8 @@ function App() {
   const [userId, setUserId] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [lineUserState, setLineUserState] = useState<LineUserState>('loading');
-  const [pdpaAccepted, setPdpaAccepted] = useState<boolean>(
-    () => !!localStorage.getItem(PDPA_KEY)
-  );
+  // PDPA ใช้แค่ session state — แสดงทุกครั้งที่เปิดหน้าสมัคร
+  const [pdpaAccepted, setPdpaAccepted] = useState<boolean>(false);
   // Admin auth gate — seed from sessionStorage so refresh doesn't log out
   const [isAdminAuthed, setIsAdminAuthed] = useState<boolean>(
     () => !!sessionStorage.getItem('admin_token')
@@ -121,26 +118,20 @@ function App() {
     );
   }
 
-  // หน้า PDPA — แสดงก่อน RegistrationForm เสมอเมื่อยังไม่ได้ยอมรับ
-  function renderRegisterOrPdpa() {
-    if (!pdpaAccepted) {
-      return (
-        <PdpaConsent
-          onAccept={() => {
-            localStorage.setItem(PDPA_KEY, '1');
-            setPdpaAccepted(true);
-          }}
-          onReject={() => {
-            if (typeof liff !== 'undefined' && liff.closeWindow) {
-              liff.closeWindow();
-            } else {
-              window.location.href = 'https://line.me/R/';
-            }
-          }}
-        />
-      );
-    }
-    return <RegistrationForm lineUserId={userId} />;
+  // PDPA block — ขึ้นก่อนเสมอถ้ายังไม่ยอมรับใน session นี้ (ไม่ว่า user state จะเป็นอะไร)
+  if (!pdpaAccepted && !window.location.pathname.startsWith('/admin')) {
+    return (
+      <PdpaConsent
+        onAccept={() => setPdpaAccepted(true)}
+        onReject={() => {
+          if (typeof liff !== 'undefined' && liff.closeWindow) {
+            liff.closeWindow();
+          } else {
+            window.location.href = 'https://line.me/R/';
+          }
+        }}
+      />
+    );
   }
 
   return (
@@ -169,13 +160,13 @@ function App() {
           <Route path="/*" element={
             <main className="py-8 px-4 max-w-5xl mx-auto w-full flex-1">
               <Routes>
-                {/* หน้าแรก / Register — ผ่าน PDPA ก่อน */}
-                <Route path="/" element={renderRegisterOrPdpa()} />
-                <Route path="/register" element={renderRegisterOrPdpa()} />
+                {/* หน้าแรก / Register — PDPA ผ่านแล้ว (จัดการก่อน Router) */}
+                <Route path="/" element={<RegistrationForm lineUserId={userId} />} />
+                <Route path="/register" element={<RegistrationForm lineUserId={userId} />} />
                 <Route path="/login" element={
                   lineUserState === 'active'
                     ? <ExternalRedirect lineUserId={userId} targetPath="login" />
-                    : renderRegisterOrPdpa()
+                    : <RegistrationForm lineUserId={userId} />
                 } />
 
                 {/* หน้าอื่นๆ */}
