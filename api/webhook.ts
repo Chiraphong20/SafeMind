@@ -4,23 +4,28 @@ const FASTAPI_BASE = "http://210.246.215.95:8000";
 const LIFF_ID = '2009105092-WldkRhqH';
 const liffBase = `https://liff.line.me/${LIFF_ID}`;
 
-// ดึงข้อมูล user จาก line_user_id — คืน { full_name, health_center_name } หรือ null ถ้าไม่พบ
-async function getUserByLineId(lineUserId: string): Promise<{ full_name: string; health_center_name: string | null } | null> {
+type UserInfo = {
+  full_name: string;
+  station_name: string | null;
+  moopart: string | null;
+  tmbpart: string | null;
+  addressid: string | null;
+  role_id: number | null;
+};
+
+// ดึงข้อมูล user จาก line_user_id — คืน field พื้นที่ครบสำหรับกรองเคส
+async function getUserByLineId(lineUserId: string): Promise<(UserInfo & { health_center_name: string | null }) | null> {
   try {
-    // 1. แลก line_user_id → JWT
     const tokenRes = await axios.post(
       `${FASTAPI_BASE}/token/line`,
       { line_user_id: lineUserId },
       { headers: { 'Content-Type': 'application/json' } }
     );
     const jwt: string = tokenRes.data.access_token;
-
-    // 2. decode JWT payload ดึง user_id
     const payload = JSON.parse(Buffer.from(jwt.split('.')[1], 'base64').toString());
     const userId: number | null = payload.user_id ?? payload.id ?? null;
     if (!userId) return null;
 
-    // 3. ดึงข้อมูล user
     const userRes = await axios.get(`${FASTAPI_BASE}/users/${userId}`, {
       headers: { Authorization: `Bearer ${jwt}` },
     });
@@ -28,10 +33,151 @@ async function getUserByLineId(lineUserId: string): Promise<{ full_name: string;
     return {
       full_name: u.full_name ?? u.name ?? u.username ?? 'เจ้าหน้าที่',
       health_center_name: u.health_center_name ?? u.health_center?.name ?? null,
+      station_name: u.station_name ?? u.hospital_name ?? null,
+      moopart: u.moopart ?? null,
+      tmbpart: u.tmbpart ?? null,
+      addressid: u.addressid ?? null,
+      role_id: u.role_id ?? null,
     };
   } catch {
     return null;
   }
+}
+
+// ดึงจำนวนเคส High Risk + ขาดนัด ตามพื้นที่ของ user
+async function fetchCaseSummary(user: UserInfo): Promise<{ highRisk: number; missed: number }> {
+  try {
+    const tokenRes = await axios.post(
+      `${FASTAPI_BASE}/token`,
+      new URLSearchParams({ username: 'admin99', password: 'admin99' }),
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+    );
+    const authHeader = { Authorization: `Bearer ${tokenRes.data.access_token}` };
+
+    // ดึง v-patients (ผู้ป่วยที่มีข้อมูล SMI-V)
+    const vRes = await axios.get(`${FASTAPI_BASE}/v-patients?limit=500`, { headers: authHeader })
+      .catch(() => null);
+    const allVPatients: any[] = vRes?.data?.items ?? (Array.isArray(vRes?.data) ? vRes?.data : []);
+
+    // กรองตามพื้นที่ — VHV (role 5): ใช้ moopart+tmbpart, รพ.สต. (role 6+): ใช้ tmbpart
+    const moo = user.moopart?.trim() ?? null;
+    const tmb = user.tmbpart?.trim() ?? null;
+
+    const areaPatients = allVPatients.filter((p: any) => {
+      const pTmb = p.tmbpart?.trim() ?? null;
+      const pMoo = p.moopart?.trim() ?? null;
+      if (!tmb) return true; // ถ้าไม่มีพื้นที่ ให้แสดงทั้งหมด
+      if (moo && user.role_id === 5) return pMoo === moo && pTmb === tmb;
+      return pTmb === tmb;
+    });
+
+    const today = Date.now();
+    const highRisk = areaPatients.filter((p: any) => {
+      const smiv = String(p.smiv_result ?? '').toLowerCase();
+      const isHigh = smiv.includes('สีแดง') || smiv.includes('high') || smiv.includes('สูง') || smiv.includes('รุนแรง');
+      if (!isHigh) return false;
+      if (!p.follow_up_date) return true;
+      const d = new Date(p.follow_up_date);
+      return isNaN(d.getTime()) || d.getTime() < today;
+    }).length;
+
+    // ดึงเคสขาดนัด
+    const MISSED_BASE = process.env.MISSED_APPT_BASE_URL ?? 'http://58.64.14.151/api/v2/public/index.php/api/v1';
+    const MISSED_KEY  = process.env.MISSED_APPT_API_KEY ?? '';
+    const fromDate = new Date(); fromDate.setDate(fromDate.getDate() - 90);
+    const toDate = new Date();
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    const missedRes = await axios.get(
+      `${MISSED_BASE}/missed_appointment?nextdate_from=${fmt(fromDate)}&nextdate_to=${fmt(toDate)}&per_page=500&page=1`,
+      { headers: MISSED_KEY ? { Authorization: `Bearer ${MISSED_KEY}` } : {} }
+    ).catch(() => null);
+    const missedRaw = missedRes?.data;
+    const allMissed: any[] = Array.isArray(missedRaw) ? missedRaw : (missedRaw?.data ?? missedRaw?.items ?? []);
+
+    const missed = allMissed.filter((p: any) => {
+      const pTmb = p.tmbpart?.trim() ?? null;
+      const pMoo = p.moopart?.trim() ?? null;
+      if (!tmb) return true;
+      if (moo && user.role_id === 5) return pMoo === moo && pTmb === tmb;
+      return pTmb === tmb;
+    }).length;
+
+    return { highRisk, missed };
+  } catch {
+    return { highRisk: 0, missed: 0 };
+  }
+}
+
+// Flex สรุปภารกิจติดตามประจำวัน
+function buildDailySummaryFlex(stationName: string, highRisk: number, missed: number) {
+  const hasUrgent = highRisk > 0 || missed > 0;
+  return {
+    type: 'flex',
+    altText: `สรุปภารกิจ: High Risk ${highRisk} ราย, ขาดนัด ${missed} ราย`,
+    contents: {
+      type: 'bubble',
+      size: 'kilo',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#1a3d6b',
+        paddingAll: '14px',
+        contents: [
+          {
+            type: 'box', layout: 'horizontal',
+            contents: [
+              { type: 'text', text: '📋', size: 'sm', flex: 0 },
+              { type: 'text', text: ' สรุปภารกิจติดตามประจำวัน', color: '#ffffff', weight: 'bold', size: 'sm', flex: 1 },
+            ],
+          },
+        ],
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        paddingAll: '14px',
+        spacing: 'sm',
+        contents: [
+          {
+            type: 'text',
+            text: `วันนี้ในเขตความรับผิดชอบของ ${stationName} มีเคสเร่งด่วนที่ค้างต้องติดตามดังนี้ครับ:`,
+            wrap: true, size: 'sm', color: '#334155',
+          },
+          ...(highRisk > 0 ? [{
+            type: 'text' as const,
+            text: `🔴 1. เคสเสี่ยงสูง (High Risk): ${highRisk} ราย`,
+            size: 'sm' as const, color: '#B91C1C', weight: 'bold' as const, wrap: true,
+          }] : []),
+          ...(missed > 0 ? [{
+            type: 'text' as const,
+            text: `📅 2. เคสขาดนัดคลินิก: ${missed} ราย`,
+            size: 'sm' as const, color: '#92400e', weight: 'bold' as const, wrap: true,
+          }] : []),
+          ...(!hasUrgent ? [{
+            type: 'text' as const,
+            text: '✅ ไม่มีเคสเร่งด่วนค้างอยู่ในพื้นที่ครับ',
+            size: 'sm' as const, color: '#16a34a',
+          }] : []),
+          {
+            type: 'text',
+            text: 'กรุณากดปุ่มด้านล่างเพื่อเลือกดูรายชื่อคนไข้และเริ่มลงบันทึกข้อมูลครับ',
+            wrap: true, size: 'xs', color: '#64748b', margin: 'md',
+          },
+        ],
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        paddingAll: '12px',
+        contents: [
+          {
+            type: 'button', style: 'primary', color: '#1a3d6b', height: 'sm',
+            action: { type: 'uri', label: '🔍 เปิดดูรายชื่อเพื่อบันทึกข้อมูล', uri: `${liffBase}/check` },
+          },
+        ],
+      },
+    },
+  };
 }
 
 // สร้าง Flex Message ทักทายแบบ personalized
@@ -365,6 +511,28 @@ export default async function handler(req: any, res: any) {
           { headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${lineToken}` } }
         );
         continue;
+      }
+
+      // Handle message — "เริ่มต้นใช้งานระบบ SafeMind" → สรุปภารกิจประจำวันตาม รพ.สต.
+      if (event.type === 'message' && event.message?.type === 'text') {
+        const text: string = (event.message.text ?? '').trim();
+        const lineUserId: string = event.source?.userId;
+        const replyToken: string = event.replyToken;
+
+        if (text === 'เริ่มต้นใช้งานระบบ SafeMind' && lineUserId) {
+          const user = await getUserByLineId(lineUserId);
+          if (user) {
+            const stationName = user.station_name ?? user.health_center_name ?? 'หน่วยงานของท่าน';
+            const { highRisk, missed } = await fetchCaseSummary(user);
+            const summaryFlex = buildDailySummaryFlex(stationName, highRisk, missed);
+            await axios.post(
+              'https://api.line.me/v2/bot/message/reply',
+              { replyToken, messages: [summaryFlex] },
+              { headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${lineToken}` } }
+            ).catch((e: any) => console.warn('Reply daily summary failed:', e.response?.data || e.message));
+          }
+          continue;
+        }
       }
 
       // Handle the "follow" event — personalized greeting + auto switch Rich Menu
