@@ -1,119 +1,180 @@
 import axios from 'axios';
 
 const FASTAPI_BASE = "http://210.246.215.95:8000";
+const LIFF_BASE = "https://liff.line.me/2009105092-WldkRhqH";
 
 export interface SmivPatient {
   hn: string;
   pt_name: string;
-  result?: string;        // สีแดง / สีเหลือง / สีเขียว
+  result?: string;
   tmbpart?: string;
+  moopart?: string;
   amppart?: string;
   chwpart?: string;
   phone?: string;
-  entry_date?: string;    // SMIV assessment date
-  nextdate?: string;      // missed appointment date
-  app_cause?: string;     // appointment reason
+  entry_date?: string;
+  nextdate?: string;
+  app_cause?: string;
 }
 
-function formatDate(d: string): string {
-  try {
-    return new Date(d).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
-  } catch { return d; }
-}
+const TAMBON_NAMES: Record<string, string> = {
+  '01': 'ปากช่อง', '02': 'กลางดง',   '03': 'จันทึก',
+  '04': 'วังกะทะ', '05': 'หมูสี',    '06': 'หนองสาหร่าย',
+  '07': 'ขนงพระ',  '08': 'โป่งตาลอง','09': 'คลองม่วง',
+  '10': 'หนองน้ำแดง','11': 'วังไทร', '12': 'พญาเย็น',
+};
 
-function row(label: string, value: string) {
-  return {
-    type: "box",
-    layout: "horizontal",
-    margin: "xs",
-    contents: [
-      { type: "text", text: label, size: "xs", color: "#888888", flex: 3 },
-      { type: "text", text: value || "-", size: "xs", color: "#111111", flex: 5, wrap: true }
-    ]
-  };
-}
-
-function buildBubble(p: SmivPatient, type: 'high-risk' | 'missed-appointment'): object {
+function buildAreaSummaryFlex(
+  tmbpart: string,
+  patients: SmivPatient[],
+  type: 'high-risk' | 'missed-appointment'
+): object {
   const isHighRisk = type === 'high-risk';
-  const headerColor = isHighRisk ? "#C62828" : "#E65100";
-  const headerText = isHighRisk
-    ? "⚠️ แจ้งเตือน กลุ่มเสี่ยงสูง"
-    : "🔔 แจ้งเตือน ผู้ป่วยขาดนัด";
+  const headerColor = isHighRisk ? '#C62828' : '#B45309';
+  const headerEmoji = isHighRisk ? '⚠️' : '🔔';
+  const headerTitle = isHighRisk ? 'แจ้งเตือน กลุ่มเสี่ยงสูง (สีแดง)' : 'แจ้งเตือน ผู้ป่วยขาดนัด';
+  const tmbName = TAMBON_NAMES[tmbpart] ?? `ตำบล ${tmbpart}`;
 
-  const location = [p.tmbpart, p.amppart, p.chwpart].filter(Boolean).join(' ') || 'ไม่ระบุ';
-  const phone = p.phone || '-';
-  const dateVal = isHighRisk
-    ? (p.entry_date ? formatDate(p.entry_date) : '-')
-    : (p.nextdate ? formatDate(p.nextdate) : '-');
-  const statusVal = isHighRisk ? (p.result || 'สีแดง') : 'ขาดนัดคลินิก';
-  const historyVal = isHighRisk ? (p.result || '-') : (p.app_cause || '-');
+  const MAX_SHOW = 15;
+  const shown = patients.slice(0, MAX_SHOW);
+  const extra = patients.length - shown.length;
 
-  const callUri = phone !== '-'
-    ? `tel:${phone.replace(/[-\s]/g, '')}`
-    : 'https://safemind-ai.net';
+  const patientRows = shown.flatMap((p, i): object[] => {
+    const moo = p.moopart ? ` หมู่ ${p.moopart}` : '';
+    const rowBg = i % 2 === 0 ? '#FEF2F2' : '#FFFFFF';
+    return [
+      {
+        type: 'box',
+        layout: 'vertical',
+        margin: i === 0 ? 'none' : 'sm',
+        paddingAll: '8px',
+        backgroundColor: rowBg,
+        cornerRadius: '6px',
+        contents: [
+          {
+            type: 'box',
+            layout: 'horizontal',
+            contents: [
+              {
+                type: 'text',
+                text: `${i + 1}.`,
+                size: 'xs',
+                color: headerColor,
+                weight: 'bold',
+                flex: 0,
+              },
+              {
+                type: 'text',
+                text: p.pt_name || '-',
+                size: 'xs',
+                weight: 'bold',
+                color: '#1a202c',
+                flex: 1,
+                margin: 'sm',
+                wrap: true,
+              },
+            ],
+          },
+          {
+            type: 'text',
+            text: `HN: ${p.hn}${moo}`,
+            size: 'xxs',
+            color: '#64748b',
+            margin: 'xs',
+          },
+        ],
+      },
+    ];
+  });
+
+  if (extra > 0) {
+    patientRows.push({
+      type: 'text',
+      text: `…และอีก ${extra} ราย ดูเพิ่มเติมในระบบ`,
+      size: 'xxs',
+      color: '#94a3b8',
+      margin: 'sm',
+      align: 'center',
+    } as object);
+  }
 
   return {
-    type: "bubble",
-    size: "mega",
+    type: 'bubble',
+    size: 'mega',
     header: {
-      type: "box",
-      layout: "vertical",
-      paddingAll: "12px",
+      type: 'box',
+      layout: 'vertical',
+      paddingAll: '14px',
       backgroundColor: headerColor,
       contents: [
-        { type: "text", text: headerText, weight: "bold", color: "#FFFFFF", size: "sm" }
-      ]
+        {
+          type: 'text',
+          text: `${headerEmoji} ${headerTitle}`,
+          weight: 'bold',
+          color: '#FFFFFF',
+          size: 'sm',
+        },
+        {
+          type: 'box',
+          layout: 'horizontal',
+          margin: 'xs',
+          contents: [
+            {
+              type: 'text',
+              text: `ต.${tmbName} · อ.ปากช่อง`,
+              color: '#ffcccc',
+              size: 'xs',
+              flex: 1,
+            },
+            {
+              type: 'text',
+              text: `${patients.length} ราย`,
+              color: '#fde68a',
+              size: 'xs',
+              weight: 'bold',
+              align: 'end',
+              flex: 0,
+            },
+          ],
+        },
+      ],
     },
     body: {
-      type: "box",
-      layout: "vertical",
-      spacing: "none",
-      paddingAll: "12px",
-      contents: [
-        row("ชื่อ-สกุล", p.pt_name || '-'),
-        row("เลข HN", p.hn),
-        row("พิกัด", location),
-        row("สถานะ", statusVal),
-        row(isHighRisk ? "ประวัติ" : "สาเหตุนัด", historyVal),
-        row(isHighRisk ? "วันประเมิน" : "วันนัดที่ขาด", dateVal),
-        row("เบอร์โทรศัพท์", phone),
-      ]
+      type: 'box',
+      layout: 'vertical',
+      paddingAll: '12px',
+      spacing: 'none',
+      contents: patientRows,
     },
     footer: {
-      type: "box",
-      layout: "vertical",
-      spacing: "sm",
-      paddingAll: "12px",
+      type: 'box',
+      layout: 'vertical',
+      paddingAll: '12px',
+      spacing: 'sm',
       contents: [
         {
-          type: "button",
-          style: "primary",
-          height: "sm",
+          type: 'button',
+          style: 'primary',
+          height: 'sm',
           color: headerColor,
-          action: { type: "uri", label: "📞 โทรหาผู้ป่วย/ญาติ", uri: callUri }
+          action: {
+            type: 'uri',
+            label: '📋 ดูรายชื่อผู้ป่วยในระบบ',
+            uri: `${LIFF_BASE}/patient-check?tmbpart=${encodeURIComponent(tmbpart)}`,
+          },
         },
         {
-          type: "button",
-          style: "secondary",
-          height: "sm",
+          type: 'button',
+          style: 'secondary',
+          height: 'sm',
           action: {
-            type: "uri",
-            label: "🗺️ นำทางลงพื้นที่เยี่ยมบ้าน",
-            uri: `https://www.google.com/maps/search/${encodeURIComponent(location)}`
-          }
+            type: 'uri',
+            label: '📝 บันทึกการเยี่ยมบ้าน',
+            uri: `${LIFF_BASE}/save`,
+          },
         },
-        {
-          type: "button",
-          style: "secondary",
-          height: "sm",
-          action: {
-            type: "uri",
-            label: "📝 บันทึกข้อมูลติดตาม",
-            uri: `https://safemind-ai.net:8080/visit/new?hn=${encodeURIComponent(p.hn)}`
-          }
-        }
-      ]
-    }
+      ],
+    },
   };
 }
 
@@ -131,30 +192,28 @@ export default async function handler(req: any, res: any) {
       target_role?: number;
     };
 
-    if (!patients || !Array.isArray(patients) || patients.length === 0) {
+    if (!patients || !Array.isArray(patients) || patients.length === 0)
       return res.status(400).json({ message: 'No patient data provided.' });
-    }
-    if (type !== 'high-risk' && type !== 'missed-appointment') {
+    if (type !== 'high-risk' && type !== 'missed-appointment')
       return res.status(400).json({ message: 'type must be high-risk or missed-appointment' });
-    }
-    const roleFilter = target_role ?? 5;
 
+    const roleFilter = target_role ?? 5;
     const lineToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
     if (!lineToken) return res.status(500).json({ error: 'LINE_CHANNEL_ACCESS_TOKEN not configured' });
-    const lineHeaders = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${lineToken}` };
+    const lineHeaders = { 'Content-Type': 'application/json', Authorization: `Bearer ${lineToken}` };
 
-    // Get machine token once
+    // machine token
     const tokenRes = await axios.post(
       `${FASTAPI_BASE}/token`,
-      new URLSearchParams({ username: "admin99", password: "admin99" }),
+      new URLSearchParams({ username: 'admin99', password: 'admin99' }),
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
     );
-    const apiHeaders = { 'Authorization': `Bearer ${tokenRes.data.access_token}` };
+    const apiHeaders = { Authorization: `Bearer ${tokenRes.data.access_token}` };
 
-    // Fetch ALL users, filter client-side (API doesn't support role_id/tmbpart query params)
+    // fetch users
     const usersRes = await axios.get(`${FASTAPI_BASE}/users`, {
       headers: apiHeaders,
-      params: { limit: 500 }
+      params: { limit: 500 },
     });
     const rawUsers: any[] = Array.isArray(usersRes.data)
       ? usersRes.data
@@ -163,7 +222,7 @@ export default async function handler(req: any, res: any) {
     const isRealLineId = (id: string) =>
       typeof id === 'string' && id.length >= 10 && !id.startsWith('UNLINKED');
 
-    const vhvAll = rawUsers.filter((u: any) =>
+    const activeUsers = rawUsers.filter((u: any) =>
       u.role_id === roleFilter && u.is_active && u.line_user_id && isRealLineId(u.line_user_id)
     );
 
@@ -175,61 +234,48 @@ export default async function handler(req: any, res: any) {
       buckets[key].push(p);
     }
 
+    const altText = type === 'high-risk'
+      ? `⚠️ แจ้งเตือน กลุ่มเสี่ยงสูง ${patients.length} ราย`
+      : `🔔 แจ้งเตือน ผู้ป่วยขาดนัด ${patients.length} ราย`;
+
     let totalSent = 0;
-    const altText = type === 'high-risk' ? 'แจ้งเตือน กลุ่มเสี่ยงสูง' : 'แจ้งเตือน ผู้ป่วยขาดนัด';
 
     for (const [tmbpart, group] of Object.entries(buckets)) {
       if (tmbpart === '__no_area__') continue;
 
-      // Match recipients: if user has no tmbpart (e.g. รพ.สต. role) → send to all
-      // if user has tmbpart → must match patient's tmbpart
-      const vhvs = vhvAll.filter((u: any) => {
+      // รพ.สต. ที่รับผิดชอบตำบลนี้ (tmbpart ว่าง = รับทุกพื้นที่)
+      const targets = activeUsers.filter((u: any) => {
         const uTmb = (u.tmbpart ?? '').trim();
         return uTmb === '' || uTmb === tmbpart;
       });
-      if (vhvs.length === 0) continue;
+      if (targets.length === 0) continue;
 
-      // LINE carousel = max 12 bubbles; split if needed
-      const CHUNK = 12;
-      for (let i = 0; i < group.length; i += CHUNK) {
-        const chunk = group.slice(i, i + CHUNK);
-        const bubbles = chunk.map(p => buildBubble(p, type));
+      // สร้าง 1 Flex สรุปต่อ 1 ตำบล
+      const flexContents = buildAreaSummaryFlex(tmbpart, group, type);
+      const flexMessage = { type: 'flex', altText, contents: flexContents };
 
-        const flexContents = bubbles.length === 1
-          ? bubbles[0]
-          : { type: "carousel", contents: bubbles };
-
-        const flexMessage = { type: "flex", altText, contents: flexContents };
-
-        for (const vhv of vhvs) {
-          try {
-            await axios.post(
-              'https://api.line.me/v2/bot/message/push',
-              { to: vhv.line_user_id, messages: [flexMessage] },
-              { headers: lineHeaders }
-            );
-            totalSent++;
-          } catch (err: any) {
-            console.error(`Push failed → ${vhv.full_name}:`, err.response?.data || err.message);
-          }
+      for (const user of targets) {
+        try {
+          await axios.post(
+            'https://api.line.me/v2/bot/message/push',
+            { to: user.line_user_id, messages: [flexMessage] },
+            { headers: lineHeaders }
+          );
+          totalSent++;
+        } catch (err: any) {
+          console.error(`Push failed → ${user.full_name}:`, err.response?.data || err.message);
         }
       }
     }
 
-    // Build debug: which tmbparts had VHVs vs patients
-    const vhvTmbs = [...new Set(vhvAll.map((u: any) => (u.tmbpart ?? '').trim()))].sort();
-    const patTmbs = [...new Set(patients.map((p: any) => (p.tmbpart ?? '').trim()))].sort();
-    const matched = patTmbs.filter(t => t && vhvTmbs.includes(t));
-
+    const patTmbs = [...new Set(patients.map((p) => (p.tmbpart ?? '').trim()))].sort();
     return res.status(200).json({
       success: true,
       push_count: totalSent,
       debug: {
-        vhv_with_line: vhvAll.length,
+        active_users: activeUsers.length,
         patient_count: patients.length,
-        vhv_tmbparts: vhvTmbs,
-        patient_tmbparts: patTmbs,
-        matched_tmbparts: matched,
+        tmbparts: patTmbs,
       },
     });
   } catch (error: any) {
