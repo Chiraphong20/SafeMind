@@ -159,19 +159,9 @@ export default async function handler(req: any, res: any) {
                 color: '#1a3d6b',
                 height: 'sm',
                 action: {
-                  type: 'uri',
+                  type: 'message',
                   label: '🚀 เริ่มต้นใช้งานระบบ SafeMind',
-                  uri: 'https://safemind-ai.net',
-                },
-              },
-              {
-                type: 'button',
-                style: 'secondary',
-                height: 'sm',
-                action: {
-                  type: 'uri',
-                  label: '📚 คู่มือการใช้งานเบื้องต้นสำหรับเจ้าหน้าที่',
-                  uri: 'https://safemind-ai.net/manual',
+                  text: 'เริ่มต้นใช้งานระบบ SafeMind',
                 },
               },
             ],

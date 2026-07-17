@@ -169,10 +169,19 @@ function buildDailySummaryFlex(stationName: string, highRisk: number, missed: nu
         type: 'box',
         layout: 'vertical',
         paddingAll: '12px',
+        spacing: 'sm',
         contents: [
           {
             type: 'button', style: 'primary', color: '#1a3d6b', height: 'sm',
-            action: { type: 'uri', label: '🔍 เปิดดูรายชื่อเพื่อบันทึกข้อมูล', uri: `${liffBase}/check` },
+            action: { type: 'uri', label: '🔍 ดูรายชื่อเคสทั้งหมด', uri: `${liffBase}/patient-check` },
+          },
+          {
+            type: 'button', style: 'secondary', height: 'sm',
+            action: { type: 'uri', label: '📅 เคสขาดนัดคลินิก', uri: `${liffBase}/patient-check` },
+          },
+          {
+            type: 'button', style: 'secondary', height: 'sm',
+            action: { type: 'uri', label: '🏠 บันทึกการเยี่ยมบ้าน', uri: `${liffBase}/save` },
           },
         ],
       },
