@@ -24,27 +24,15 @@ async function getUserByLineId(lineUserId: string): Promise<(UserInfo & { health
     const jwt: string = tokenRes.data.access_token;
     const authHeader = { Authorization: `Bearer ${jwt}` };
 
-    // ลอง endpoint หลัก: /users/by-line/{id}
+    // fetch users ทั้งหมดแล้ว filter ด้วย line_user_id
     let u: any = null;
-    try {
-      const r = await axios.get(`${FASTAPI_BASE}/users/by-line/${lineUserId}`, { headers: authHeader });
-      u = r.data;
-    } catch (e1: any) {
-      console.warn('[getUserByLineId] /by-line failed:', e1.response?.status, JSON.stringify(e1.response?.data));
-
-      // fallback: query param
-      try {
-        const r2 = await axios.get(`${FASTAPI_BASE}/users`, {
-          headers: authHeader,
-          params: { line_user_id: lineUserId, limit: 1 },
-        });
-        const list = Array.isArray(r2.data) ? r2.data : (r2.data?.items ?? r2.data?.data ?? []);
-        u = list[0] ?? null;
-        if (u) console.log('[getUserByLineId] found via query param fallback');
-      } catch (e2: any) {
-        console.warn('[getUserByLineId] /users?line_user_id= also failed:', e2.response?.status, JSON.stringify(e2.response?.data));
-      }
-    }
+    const r = await axios.get(`${FASTAPI_BASE}/users`, {
+      headers: authHeader,
+      params: { limit: 500 },
+    });
+    const list: any[] = Array.isArray(r.data) ? r.data : (r.data?.items ?? r.data?.data ?? []);
+    u = list.find((item: any) => item.line_user_id === lineUserId) ?? null;
+    if (!u) console.warn(`[getUserByLineId] no user matched line_user_id=${lineUserId} (total fetched: ${list.length})`);
 
     if (!u) return null;
     return {
