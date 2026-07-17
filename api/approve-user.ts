@@ -59,16 +59,122 @@ export default async function handler(req: any, res: any) {
         { headers: lineHeaders }
       ).catch((e: any) => console.warn('Rich Menu assign failed:', e.response?.data || e.message));
 
-      // Push แจ้งอนุมัติ
+      // สังกัดของ user
+      const userData = userRes.data;
+      const affiliation: string = userData.station_name || userData.hospital_name || 'หน่วยงาน SafeMind';
+
+      // Push Flex Message แจ้งอนุมัติ
+      const flexMessage = {
+        type: 'flex',
+        altText: `✅ บัญชีของ${fullName} ได้รับการอนุมัติแล้วครับ`,
+        contents: {
+          type: 'bubble',
+          size: 'kilo',
+          header: {
+            type: 'box',
+            layout: 'vertical',
+            backgroundColor: '#1a3d6b',
+            paddingAll: '16px',
+            contents: [
+              {
+                type: 'box',
+                layout: 'horizontal',
+                spacing: 'sm',
+                contents: [
+                  {
+                    type: 'text',
+                    text: '✅',
+                    size: 'lg',
+                    flex: 0,
+                  },
+                  {
+                    type: 'text',
+                    text: 'ยินดีต้อนรับเข้าใช้งานระบบ',
+                    color: '#ffffff',
+                    weight: 'bold',
+                    size: 'md',
+                    wrap: true,
+                  },
+                ],
+              },
+            ],
+          },
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'md',
+            paddingAll: '16px',
+            contents: [
+              {
+                type: 'text',
+                text: `สวัสดีครับ ${fullName}`,
+                weight: 'bold',
+                size: 'md',
+                color: '#1a3d6b',
+                wrap: true,
+              },
+              {
+                type: 'text',
+                text: `สังกัด: ${affiliation}`,
+                size: 'sm',
+                color: '#555555',
+                wrap: true,
+              },
+              {
+                type: 'separator',
+                margin: 'sm',
+              },
+              {
+                type: 'text',
+                text: 'น้อง SafeMind ยินดีต้อนรับครับ! ระบบได้ยืนยันสิทธิ์ของท่านและเชื่อมข้อมูลเข้ากับหน่วยงานเรียบร้อยแล้ว',
+                size: 'sm',
+                color: '#444444',
+                wrap: true,
+              },
+              {
+                type: 'text',
+                text: '✅ บัญชีของท่านปลอดภัยและพร้อมใช้งาน ท่านสามารถกดปุ่มด้านล่างเพื่อเลือกเมนูด้านล่างได้ทันทีครับ',
+                size: 'sm',
+                color: '#2e7d32',
+                wrap: true,
+              },
+            ],
+          },
+          footer: {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'sm',
+            paddingAll: '12px',
+            contents: [
+              {
+                type: 'button',
+                style: 'primary',
+                color: '#1a3d6b',
+                height: 'sm',
+                action: {
+                  type: 'uri',
+                  label: '🚀 เริ่มต้นใช้งานระบบ SafeMind',
+                  uri: 'https://safemind-ai.net',
+                },
+              },
+              {
+                type: 'button',
+                style: 'secondary',
+                height: 'sm',
+                action: {
+                  type: 'uri',
+                  label: '📚 คู่มือการใช้งานเบื้องต้นสำหรับเจ้าหน้าที่',
+                  uri: 'https://safemind-ai.net/manual',
+                },
+              },
+            ],
+          },
+        },
+      };
+
       await axios.post(
         'https://api.line.me/v2/bot/message/push',
-        {
-          to: lineUserId,
-          messages: [{
-            type: 'text',
-            text: `✅ บัญชีของ${fullName} ได้รับการอนุมัติแล้วครับ\n\nสามารถใช้งาน SafeMind ได้เลย กดเมนูด้านล่างเพื่อเริ่มต้นใช้งานครับ 🙏`,
-          }],
-        },
+        { to: lineUserId, messages: [flexMessage] },
         { headers: lineHeaders }
       ).catch((e: any) => console.warn('Push failed:', e.response?.data || e.message));
 
