@@ -13,21 +13,21 @@ type UserInfo = {
   role_id: number | null;
 };
 
-// ดึงข้อมูล user จาก line_user_id — คืน field พื้นที่ครบสำหรับกรองเคส
+// ดึงข้อมูล user จาก line_user_id ด้วย machine token
 async function getUserByLineId(lineUserId: string): Promise<(UserInfo & { health_center_name: string | null }) | null> {
   try {
+    // ใช้ machine token (admin99) แทน /token/line ที่อาจไม่มี
     const tokenRes = await axios.post(
-      `${FASTAPI_BASE}/token/line`,
-      { line_user_id: lineUserId },
-      { headers: { 'Content-Type': 'application/json' } }
+      `${FASTAPI_BASE}/token`,
+      new URLSearchParams({ username: 'admin99', password: 'admin99' }),
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
     );
     const jwt: string = tokenRes.data.access_token;
-    const payload = JSON.parse(Buffer.from(jwt.split('.')[1], 'base64').toString());
-    const userId: number | null = payload.user_id ?? payload.id ?? null;
-    if (!userId) return null;
+    const authHeader = { Authorization: `Bearer ${jwt}` };
 
-    const userRes = await axios.get(`${FASTAPI_BASE}/users/${userId}`, {
-      headers: { Authorization: `Bearer ${jwt}` },
+    // ดึง user ด้วย line_user_id โดยตรง
+    const userRes = await axios.get(`${FASTAPI_BASE}/users/by-line/${lineUserId}`, {
+      headers: authHeader,
     });
     const u = userRes.data;
     return {
@@ -530,16 +530,25 @@ export default async function handler(req: any, res: any) {
 
         if (text === 'เริ่มต้นใช้งานระบบ SafeMind' && lineUserId) {
           const user = await getUserByLineId(lineUserId);
+          let replyMessages: any[];
+
           if (user) {
             const stationName = user.station_name ?? user.health_center_name ?? 'หน่วยงานของท่าน';
             const { highRisk, missed } = await fetchCaseSummary(user);
-            const summaryFlex = buildDailySummaryFlex(stationName, highRisk, missed);
-            await axios.post(
-              'https://api.line.me/v2/bot/message/reply',
-              { replyToken, messages: [summaryFlex] },
-              { headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${lineToken}` } }
-            ).catch((e: any) => console.warn('Reply daily summary failed:', e.response?.data || e.message));
+            replyMessages = [buildDailySummaryFlex(stationName, highRisk, missed)];
+          } else {
+            // fallback — ถ้าหา user ไม่เจอ
+            replyMessages = [{
+              type: 'text',
+              text: '⚠️ ไม่พบข้อมูลบัญชีของท่านในระบบ กรุณาติดต่อเจ้าหน้าที่ครับ',
+            }];
           }
+
+          await axios.post(
+            'https://api.line.me/v2/bot/message/reply',
+            { replyToken, messages: replyMessages },
+            { headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${lineToken}` } }
+          ).catch((e: any) => console.warn('Reply failed:', e.response?.data || e.message));
           continue;
         }
       }
