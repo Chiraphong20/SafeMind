@@ -243,10 +243,10 @@ export default async function handler(req: any, res: any) {
     for (const [tmbpart, group] of Object.entries(buckets)) {
       if (tmbpart === '__no_area__') continue;
 
-      // รพ.สต. ที่รับผิดชอบตำบลนี้ (tmbpart ว่าง = รับทุกพื้นที่)
+      // ส่งเฉพาะ รพ.สต. ที่รับผิดชอบตำบลนี้เท่านั้น
       const targets = activeUsers.filter((u: any) => {
         const uTmb = (u.tmbpart ?? '').trim();
-        return uTmb === '' || uTmb === tmbpart;
+        return uTmb === tmbpart;
       });
       if (targets.length === 0) continue;
 
