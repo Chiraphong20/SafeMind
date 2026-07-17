@@ -118,8 +118,8 @@ function App() {
     );
   }
 
-  // PDPA block — ขึ้นก่อนเสมอถ้ายังไม่ยอมรับใน session นี้ (ไม่ว่า user state จะเป็นอะไร)
-  if (!pdpaAccepted && !window.location.pathname.startsWith('/admin')) {
+  // PDPA block — แสดงเฉพาะ not_found (คนที่ยังไม่ได้สมัคร) เท่านั้น
+  if (lineUserState === 'not_found' && !pdpaAccepted && !window.location.pathname.startsWith('/admin')) {
     return (
       <PdpaConsent
         onAccept={() => setPdpaAccepted(true)}
