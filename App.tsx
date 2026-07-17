@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import liff from '@line/liff';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import RegistrationForm from './components/RegistrationForm';
+import PdpaConsent from './components/PdpaConsent';
 import Approve from './components/Approve';
 import AdminLogin from './components/AdminLogin';
 import SmiVTable from './components/SmiVTable';
@@ -9,6 +10,8 @@ import SpotMap from './components/SpotMap';
 import AppointmentPage from './components/AppointmentPage';
 import { ShieldCheck, Loader2 } from 'lucide-react';
 import ExternalRedirect from './components/ExternalRedirect';
+
+const PDPA_KEY = 'pdpa_accepted_v1';
 
 // --- Component หลัก ---
 
@@ -32,6 +35,9 @@ function App() {
   const [userId, setUserId] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [lineUserState, setLineUserState] = useState<LineUserState>('loading');
+  const [pdpaAccepted, setPdpaAccepted] = useState<boolean>(
+    () => !!localStorage.getItem(PDPA_KEY)
+  );
   // Admin auth gate — seed from sessionStorage so refresh doesn't log out
   const [isAdminAuthed, setIsAdminAuthed] = useState<boolean>(
     () => !!sessionStorage.getItem('admin_token')
@@ -115,6 +121,28 @@ function App() {
     );
   }
 
+  // หน้า PDPA — แสดงก่อน RegistrationForm เสมอเมื่อยังไม่ได้ยอมรับ
+  function renderRegisterOrPdpa() {
+    if (!pdpaAccepted) {
+      return (
+        <PdpaConsent
+          onAccept={() => {
+            localStorage.setItem(PDPA_KEY, '1');
+            setPdpaAccepted(true);
+          }}
+          onReject={() => {
+            if (typeof liff !== 'undefined' && liff.closeWindow) {
+              liff.closeWindow();
+            } else {
+              window.location.href = 'https://line.me/R/';
+            }
+          }}
+        />
+      );
+    }
+    return <RegistrationForm lineUserId={userId} />;
+  }
+
   return (
     <Router>
       <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
@@ -141,13 +169,13 @@ function App() {
           <Route path="/*" element={
             <main className="py-8 px-4 max-w-5xl mx-auto w-full flex-1">
               <Routes>
-                {/* หน้าแรก / Register */}
-                <Route path="/" element={<RegistrationForm lineUserId={userId} />} />
-                <Route path="/register" element={<RegistrationForm lineUserId={userId} />} />
+                {/* หน้าแรก / Register — ผ่าน PDPA ก่อน */}
+                <Route path="/" element={renderRegisterOrPdpa()} />
+                <Route path="/register" element={renderRegisterOrPdpa()} />
                 <Route path="/login" element={
                   lineUserState === 'active'
                     ? <ExternalRedirect lineUserId={userId} targetPath="login" />
-                    : <RegistrationForm lineUserId={userId} />
+                    : renderRegisterOrPdpa()
                 } />
 
                 {/* หน้าอื่นๆ */}
