@@ -240,25 +240,30 @@ export default async function handler(req: any, res: any) {
 
     let totalSent = 0;
 
+    // สร้าง messages ทุก tmbpart ก่อน
+    const allMessages: { tmbpart: string; flex: object }[] = [];
     for (const [tmbpart, group] of Object.entries(buckets)) {
       if (tmbpart === '__no_area__') continue;
-
-      // ส่งเฉพาะ รพ.สต. ที่รับผิดชอบตำบลนี้เท่านั้น
-      const targets = activeUsers.filter((u: any) => {
-        const uTmb = (u.tmbpart ?? '').trim();
-        return uTmb === tmbpart;
+      allMessages.push({
+        tmbpart,
+        flex: buildAreaSummaryFlex(tmbpart, group, type),
       });
-      if (targets.length === 0) continue;
+    }
 
-      // สร้าง 1 Flex สรุปต่อ 1 ตำบล
-      const flexContents = buildAreaSummaryFlex(tmbpart, group, type);
-      const flexMessage = { type: 'flex', altText, contents: flexContents };
+    for (const user of activeUsers) {
+      const uTmb = (user.tmbpart ?? '').trim();
 
-      for (const user of targets) {
+      // ถ้า user มี tmbpart ตั้งไว้ → ส่งเฉพาะพื้นที่นั้น
+      // ถ้า user ไม่มี tmbpart (null/ว่าง) → ส่งทุกพื้นที่ (broadcast)
+      const msgToSend = uTmb
+        ? allMessages.filter(m => m.tmbpart === uTmb)
+        : allMessages;
+
+      for (const msg of msgToSend) {
         try {
           await axios.post(
             'https://api.line.me/v2/bot/message/push',
-            { to: user.line_user_id, messages: [flexMessage] },
+            { to: user.line_user_id, messages: [{ type: 'flex', altText, contents: msg.flex }] },
             { headers: lineHeaders }
           );
           totalSent++;
