@@ -54,10 +54,11 @@ export default async function handler(req: any, res: any) {
     }
 
     const lineHeaders = { Authorization: `Bearer ${lineToken}`, 'Content-Type': 'application/json' };
+    let rmResult: string = 'skipped';
 
     if (isActive === 1) {
       // 4a. อนุมัติ → กำหนด Richmenu 2
-      const rmResult = await axios.post(
+      rmResult = await axios.post(
         `https://api.line.me/v2/bot/user/${lineUserId}/richmenu/${RICHMENU_ACTIVE_ID}`,
         {},
         { headers: lineHeaders }

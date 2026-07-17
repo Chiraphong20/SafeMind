@@ -16,7 +16,6 @@ type UserInfo = {
 // ดึงข้อมูล user จาก line_user_id ด้วย machine token
 async function getUserByLineId(lineUserId: string): Promise<(UserInfo & { health_center_name: string | null }) | null> {
   try {
-    // ใช้ machine token (admin99) แทน /token/line ที่อาจไม่มี
     const tokenRes = await axios.post(
       `${FASTAPI_BASE}/token`,
       new URLSearchParams({ username: 'admin99', password: 'admin99' }),
@@ -25,11 +24,29 @@ async function getUserByLineId(lineUserId: string): Promise<(UserInfo & { health
     const jwt: string = tokenRes.data.access_token;
     const authHeader = { Authorization: `Bearer ${jwt}` };
 
-    // ดึง user ด้วย line_user_id โดยตรง
-    const userRes = await axios.get(`${FASTAPI_BASE}/users/by-line/${lineUserId}`, {
-      headers: authHeader,
-    });
-    const u = userRes.data;
+    // ลอง endpoint หลัก: /users/by-line/{id}
+    let u: any = null;
+    try {
+      const r = await axios.get(`${FASTAPI_BASE}/users/by-line/${lineUserId}`, { headers: authHeader });
+      u = r.data;
+    } catch (e1: any) {
+      console.warn('[getUserByLineId] /by-line failed:', e1.response?.status, JSON.stringify(e1.response?.data));
+
+      // fallback: query param
+      try {
+        const r2 = await axios.get(`${FASTAPI_BASE}/users`, {
+          headers: authHeader,
+          params: { line_user_id: lineUserId, limit: 1 },
+        });
+        const list = Array.isArray(r2.data) ? r2.data : (r2.data?.items ?? r2.data?.data ?? []);
+        u = list[0] ?? null;
+        if (u) console.log('[getUserByLineId] found via query param fallback');
+      } catch (e2: any) {
+        console.warn('[getUserByLineId] /users?line_user_id= also failed:', e2.response?.status, JSON.stringify(e2.response?.data));
+      }
+    }
+
+    if (!u) return null;
     return {
       full_name: u.full_name ?? u.name ?? u.username ?? 'เจ้าหน้าที่',
       health_center_name: u.health_center_name ?? u.health_center?.name ?? null,
@@ -39,7 +56,8 @@ async function getUserByLineId(lineUserId: string): Promise<(UserInfo & { health
       addressid: u.addressid ?? null,
       role_id: u.role_id ?? null,
     };
-  } catch {
+  } catch (err: any) {
+    console.error('[getUserByLineId] unexpected error:', err.message);
     return null;
   }
 }
