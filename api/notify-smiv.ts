@@ -269,13 +269,19 @@ export default async function handler(req: any, res: any) {
     }
 
     const patTmbs = [...new Set(patients.map((p) => (p.tmbpart ?? '').trim()))].sort();
+    const userTmbSample = activeUsers.map((u: any) => ({
+      name: u.full_name,
+      tmbpart: u.tmbpart ?? null,
+      role_id: u.role_id,
+    }));
     return res.status(200).json({
       success: true,
       push_count: totalSent,
       debug: {
         active_users: activeUsers.length,
         patient_count: patients.length,
-        tmbparts: patTmbs,
+        patient_tmbparts: patTmbs,
+        user_tmbparts: userTmbSample,
       },
     });
   } catch (error: any) {
