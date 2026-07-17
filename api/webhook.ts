@@ -157,7 +157,7 @@ function buildWelcomeFlex(name: string, hcName: string | null) {
 function buildRegisterFlex() {
   return {
     type: 'flex',
-    altText: 'ยินดีต้อนรับสู่ SafeMind 💙 กรุณาสมัครใช้งานก่อนนะครับ',
+    altText: 'ยินดีต้อนรับสู่ SafeMind 💙 สมัครได้ที่เมนูข้างล่างครับ',
     contents: {
       type: 'bubble',
       size: 'kilo',
@@ -195,31 +195,22 @@ function buildRegisterFlex() {
         type: 'box',
         layout: 'vertical',
         paddingAll: '14px',
+        spacing: 'sm',
         contents: [
           {
             type: 'text',
-            text: 'ขณะนี้บัญชี LINE ของท่านยังไม่ได้ลงทะเบียนในระบบ\nกรุณากดปุ่ม "สมัครใช้งาน" เพื่อเริ่มต้นครับ 👇',
+            text: 'ขณะนี้บัญชี LINE ของท่านยังไม่ได้ลงทะเบียนในระบบครับ',
             wrap: true,
             size: 'sm',
             color: '#334155',
           },
-        ],
-      },
-      footer: {
-        type: 'box',
-        layout: 'vertical',
-        paddingAll: '12px',
-        contents: [
           {
-            type: 'button',
-            style: 'primary',
-            color: '#0284C7',
-            height: 'sm',
-            action: {
-              type: 'uri',
-              label: '📝 สมัครใช้งาน',
-              uri: `${liffBase}/login`,
-            },
+            type: 'text',
+            text: '👇 สมัครได้ที่เมนูข้างล่างครับ',
+            wrap: true,
+            size: 'sm',
+            color: '#0B3D6B',
+            weight: 'bold',
           },
         ],
       },
