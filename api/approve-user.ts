@@ -41,7 +41,11 @@ export default async function handler(req: any, res: any) {
     const fullName: string = userRes.data.full_name || 'คุณ';
 
     if (!lineUserId) {
-      return res.status(200).json({ success: true, message: 'Status updated, no LINE user ID' });
+      return res.status(200).json({
+        success: true,
+        message: 'Status updated, no LINE user ID — Richmenu ไม่เปลี่ยน',
+        debug: { user_id, full_name: fullName, line_user_id: null },
+      });
     }
 
     const lineToken = process.env.LINE_CHANNEL_ACCESS_TOKEN;
@@ -53,11 +57,14 @@ export default async function handler(req: any, res: any) {
 
     if (isActive === 1) {
       // 4a. อนุมัติ → กำหนด Richmenu 2
-      await axios.post(
+      const rmResult = await axios.post(
         `https://api.line.me/v2/bot/user/${lineUserId}/richmenu/${RICHMENU_ACTIVE_ID}`,
         {},
         { headers: lineHeaders }
-      ).catch((e: any) => console.warn('Rich Menu assign failed:', e.response?.data || e.message));
+      ).then(() => 'ok').catch((e: any) => {
+        console.warn('Rich Menu assign failed:', e.response?.data || e.message);
+        return `failed: ${JSON.stringify(e.response?.data || e.message)}`;
+      });
 
       // สังกัดของ user
       const userData = userRes.data;
@@ -186,7 +193,12 @@ export default async function handler(req: any, res: any) {
       ).catch((e: any) => console.warn('Rich Menu unlink failed:', e.response?.data || e.message));
     }
 
-    return res.status(200).json({ success: true, line_user_id: lineUserId, is_active: isActive });
+    return res.status(200).json({
+      success: true,
+      is_active: isActive,
+      line_user_id: lineUserId,
+      richmenu: isActive === 1 ? rmResult : 'unlinked',
+    });
 
   } catch (err: any) {
     console.error('approve-user error:', err.response?.data || err.message);
