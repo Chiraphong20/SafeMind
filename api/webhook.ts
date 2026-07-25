@@ -504,6 +504,73 @@ function buildPatientActionFlex(hn: string, name: string, caseType: string) {
   };
 }
 
+// สร้าง Flex เลือกเหตุผลแจ้งข้อมูลผิดพลาด (4 ปุ่ม)
+function buildReportErrorFlex(hn: string, name: string) {
+  return {
+    type: 'flex',
+    altText: `⚠️ แจ้งปรับปรุงข้อมูลเคส ${name}`,
+    contents: {
+      type: 'bubble',
+      size: 'kilo',
+      header: {
+        type: 'box', layout: 'vertical', backgroundColor: '#dc2626', paddingAll: '14px',
+        contents: [
+          { type: 'text', text: '⚠️ แจ้งปรับปรุงข้อมูลเคส', color: '#ffffff', weight: 'bold', size: 'sm' },
+        ],
+      },
+      body: {
+        type: 'box', layout: 'vertical', paddingAll: '14px', spacing: 'sm',
+        contents: [
+          { type: 'text', text: name, weight: 'bold', size: 'md', color: '#1e293b', wrap: true },
+          { type: 'text', text: `HN: ${hn}`, size: 'xs', color: '#64748b' },
+          { type: 'separator', margin: 'md' },
+          {
+            type: 'text', text: 'เลือกเหตุผลที่ต้องการแจ้ง:',
+            size: 'xs', color: '#475569', wrap: true, margin: 'md',
+          },
+        ],
+      },
+      footer: {
+        type: 'box', layout: 'vertical', paddingAll: '12px', spacing: 'sm',
+        contents: [
+          {
+            type: 'button', style: 'primary', color: '#dc2626', height: 'sm',
+            action: {
+              type: 'postback', label: '❌ ไม่ใช่คนไข้ในเขต',
+              data: `action=report_reason&hn=${hn}&reason=wrong-jurisdiction`,
+              displayText: 'แจ้ง: ไม่ใช่คนไข้ในเขตรับผิดชอบ',
+            },
+          },
+          {
+            type: 'button', style: 'secondary', height: 'sm',
+            action: {
+              type: 'postback', label: '🚗 ย้ายที่อยู่/ติดต่อไม่ได้',
+              data: `action=report_reason&hn=${hn}&reason=unreachable`,
+              displayText: 'แจ้ง: ผู้ป่วยย้ายที่อยู่หรือติดต่อไม่ได้',
+            },
+          },
+          {
+            type: 'button', style: 'secondary', height: 'sm',
+            action: {
+              type: 'postback', label: '📊 ข้อมูลอาการไม่ตรงความจริง',
+              data: `action=report_reason&hn=${hn}&reason=inaccurate-status`,
+              displayText: 'แจ้ง: ข้อมูลอาการ/สถานะไม่ตรงความจริง',
+            },
+          },
+          {
+            type: 'button', style: 'secondary', height: 'sm',
+            action: {
+              type: 'postback', label: '✏️ อื่นๆ (พิมพ์ระบุ)',
+              data: `action=report_reason&hn=${hn}&reason=other`,
+              displayText: 'แจ้ง: อื่นๆ (จะพิมพ์ระบุเหตุผล)',
+            },
+          },
+        ],
+      },
+    },
+  };
+}
+
 // บันทึก patient-follow ผ่าน Machine token
 async function recordPatientFollow(hn: string, followStatus: string, remark: string): Promise<boolean> {
   try {
@@ -517,6 +584,24 @@ async function recordPatientFollow(hn: string, followStatus: string, remark: str
     return true;
   } catch {
     return false;
+  }
+}
+
+// ค้นหา record "รอข้อมูลเพิ่มเติม" ที่ฝากไว้สำหรับ LINE user นี้ (ใช้กับ reason=other)
+async function findPendingOtherRecord(lineUserId: string): Promise<{ id: number; hn: string } | null> {
+  try {
+    const jwt = await getMachineToken();
+    const r = await axios.get(`${FASTAPI_BASE}/patient-follow`, {
+      params: { follow_status: 'รอข้อมูลเพิ่มเติม', limit: 50 },
+      headers: { Authorization: `Bearer ${jwt}` },
+    });
+    const items: any[] = r.data?.items ?? (Array.isArray(r.data) ? r.data : []);
+    const match = items.find((item: any) => (item.remark ?? '').includes(`|lid=${lineUserId}`));
+    if (!match) return null;
+    const hnMatch = (match.remark ?? '').match(/hn=([^|]+)/);
+    return { id: match.id, hn: hnMatch ? hnMatch[1] : '' };
+  } catch {
+    return null;
   }
 }
 
@@ -798,6 +883,62 @@ export default async function handler(req: any, res: any) {
         continue;
       }
 
+      // Handle postback: report_error — แสดง Flex 4 ปุ่มเหตุผลสำหรับเคสแรกของพื้นที่
+      if (event.type === 'postback' && event.postback?.data === 'action=report_error') {
+        const lineUserId: string = event.source?.userId;
+        const user = lineUserId ? await getUserByLineId(lineUserId) : null;
+        let replyMessages: any[];
+        if (!user) {
+          replyMessages = [{ type: 'text', text: '⚠️ ไม่พบข้อมูลบัญชีในระบบ กรุณาติดต่อผู้ดูแลระบบครับ' }];
+        } else {
+          const patients = await fetchUrgentPatients(user);
+          if (patients.length === 0) {
+            replyMessages = [{ type: 'text', text: '✅ ไม่มีเคสเร่งด่วนในพื้นที่ของท่านขณะนี้ครับ' }];
+          } else {
+            const p = patients[0];
+            replyMessages = [buildReportErrorFlex(p.hn, p.name)];
+          }
+        }
+        await axios.post(
+          'https://api.line.me/v2/bot/message/reply',
+          { replyToken: event.replyToken, messages: replyMessages },
+          { headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${lineToken}` } }
+        ).catch((e: any) => console.warn('reply report_error failed:', e.response?.data || e.message));
+        continue;
+      }
+
+      // Handle postback: report_reason — บันทึกเหตุผลการแจ้งข้อมูลผิดพลาด
+      if (event.type === 'postback' && (event.postback?.data ?? '').startsWith('action=report_reason')) {
+        const params = new URLSearchParams(event.postback.data);
+        const hn = params.get('hn') ?? '';
+        const reason = params.get('reason') ?? '';
+        const lineUserId: string = event.source?.userId ?? '';
+
+        const REASON_LABELS: Record<string, string> = {
+          'wrong-jurisdiction': 'ไม่ใช่คนไข้ในเขตรับผิดชอบ',
+          'unreachable': 'ผู้ป่วยย้ายที่อยู่/ติดต่อไม่ได้',
+          'inaccurate-status': 'ข้อมูลอาการ/สถานะไม่ตรงความจริง',
+        };
+
+        let msg: string;
+        if (reason === 'other') {
+          await recordPatientFollow(hn, 'รอข้อมูลเพิ่มเติม', `PENDING_OTHER|hn=${hn}|lid=${lineUserId}`);
+          msg = `📝 รับทราบแล้วครับ\n\nHN: ${hn}\nกรุณาพิมพ์ข้อความระบุเหตุผลเพิ่มเติม แล้วส่งเข้าแชทได้เลยครับ`;
+        } else {
+          const label = REASON_LABELS[reason] ?? reason;
+          await recordPatientFollow(hn, 'แจ้งข้อมูลผิดพลาด', `บันทึกจาก LINE: ${label}`);
+          const thaiTime = new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' });
+          msg = `✅ บันทึกเรียบร้อยแล้วครับ!\n\nHN: ${hn}\nเหตุผล: ${label}\nเวลา: ${thaiTime}\n\nระบบจะแจ้งให้ผู้ดูแลตรวจสอบต่อไปครับ`;
+        }
+
+        await axios.post(
+          'https://api.line.me/v2/bot/message/reply',
+          { replyToken: event.replyToken, messages: [{ type: 'text', text: msg }] },
+          { headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${lineToken}` } }
+        ).catch((e: any) => console.warn('reply report_reason failed:', e.response?.data || e.message));
+        continue;
+      }
+
       // Handle postback — ตารางบริการ
       if (event.type === 'postback' && event.postback?.data === 'action=schedule_menu') {
         await axios.post(
@@ -836,6 +977,28 @@ export default async function handler(req: any, res: any) {
             { headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${lineToken}` } }
           ).catch((e: any) => console.warn('Reply failed:', e.response?.data || e.message));
           continue;
+        }
+
+        // รับข้อความที่ผู้ใช้พิมพ์หลังกด "อื่นๆ (พิมพ์ระบุ)"
+        if (lineUserId && text) {
+          const pending = await findPendingOtherRecord(lineUserId);
+          if (pending) {
+            const jwt = await getMachineToken();
+            const remark = `บันทึกจาก LINE: อื่นๆ — ${text}`;
+            await axios.put(
+              `${FASTAPI_BASE}/patient-follow/${pending.id}`,
+              { follow_status: 'แจ้งข้อมูลผิดพลาด', remark },
+              { headers: { Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json' } }
+            ).catch(() => {});
+            const thaiTime = new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' });
+            const replyMsg = `✅ รับข้อมูลเรียบร้อยแล้วครับ!\n\nHN: ${pending.hn}\nเหตุผล: ${text}\nเวลา: ${thaiTime}\n\nระบบจะแจ้งให้ผู้ดูแลตรวจสอบต่อไปครับ`;
+            await axios.post(
+              'https://api.line.me/v2/bot/message/reply',
+              { replyToken, messages: [{ type: 'text', text: replyMsg }] },
+              { headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${lineToken}` } }
+            ).catch((e: any) => console.warn('reply pending_other failed:', e.response?.data || e.message));
+            continue;
+          }
         }
       }
 
