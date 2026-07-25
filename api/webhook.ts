@@ -588,7 +588,7 @@ async function recordPatientFollow(hn: string, followStatus: string, remark: str
 }
 
 // ค้นหา record "รอข้อมูลเพิ่มเติม" ที่ฝากไว้สำหรับ LINE user นี้ (ใช้กับ reason=other)
-async function findPendingOtherRecord(lineUserId: string): Promise<{ id: number; hn: string } | null> {
+async function findPendingOtherRecord(lineUserId: string): Promise<{ id: number; hn: string; rawRemark: string } | null> {
   try {
     const jwt = await getMachineToken();
     const r = await axios.get(`${FASTAPI_BASE}/patient-follow`, {
@@ -598,8 +598,9 @@ async function findPendingOtherRecord(lineUserId: string): Promise<{ id: number;
     const items: any[] = r.data?.items ?? (Array.isArray(r.data) ? r.data : []);
     const match = items.find((item: any) => (item.remark ?? '').includes(`|lid=${lineUserId}`));
     if (!match) return null;
-    const hnMatch = (match.remark ?? '').match(/hn=([^|]+)/);
-    return { id: match.id, hn: hnMatch ? hnMatch[1] : '' };
+    const rawRemark: string = match.remark ?? '';
+    const hnMatch = rawRemark.match(/hn=([^|]+)/);
+    return { id: match.id, hn: hnMatch ? hnMatch[1] : '', rawRemark };
   } catch {
     return null;
   }
@@ -914,6 +915,11 @@ export default async function handler(req: any, res: any) {
         const reason = params.get('reason') ?? '';
         const lineUserId: string = event.source?.userId ?? '';
 
+        // ดึงข้อมูลผู้แจ้งเพื่อฝังใน remark ให้แอดมินเห็น
+        const reporter = lineUserId ? await getUserByLineId(lineUserId) : null;
+        const reporterName = reporter?.full_name ?? 'เจ้าหน้าที่';
+        const stationName = reporter?.station_name ?? reporter?.health_center_name ?? '';
+
         const REASON_LABELS: Record<string, string> = {
           'wrong-jurisdiction': 'ไม่ใช่คนไข้ในเขตรับผิดชอบ',
           'unreachable': 'ผู้ป่วยย้ายที่อยู่/ติดต่อไม่ได้',
@@ -922,11 +928,18 @@ export default async function handler(req: any, res: any) {
 
         let msg: string;
         if (reason === 'other') {
-          await recordPatientFollow(hn, 'รอข้อมูลเพิ่มเติม', `PENDING_OTHER|hn=${hn}|lid=${lineUserId}`);
+          // เก็บ pending — รอ user พิมพ์เหตุผลต่อ (ฝัง reporter ไว้ใน PENDING marker ด้วย)
+          await recordPatientFollow(
+            hn, 'รอข้อมูลเพิ่มเติม',
+            `PENDING_OTHER|hn=${hn}|lid=${lineUserId}|reporter=${reporterName}|station=${stationName}`
+          );
           msg = `📝 รับทราบแล้วครับ\n\nHN: ${hn}\nกรุณาพิมพ์ข้อความระบุเหตุผลเพิ่มเติม แล้วส่งเข้าแชทได้เลยครับ`;
         } else {
           const label = REASON_LABELS[reason] ?? reason;
-          await recordPatientFollow(hn, 'แจ้งข้อมูลผิดพลาด', `บันทึกจาก LINE: ${label}`);
+          // remark ใช้ key: value pattern เดียวกับ parseRemark ใน LineManagePage
+          const remarkParts = [`เหตุผล: ${label}`, `ผู้แจ้ง: ${reporterName}`];
+          if (stationName) remarkParts.push(`รพ.สต.: ${stationName}`);
+          await recordPatientFollow(hn, 'แจ้งข้อมูลผิดพลาด', remarkParts.join(' | '));
           const thaiTime = new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' });
           msg = `✅ บันทึกเรียบร้อยแล้วครับ!\n\nHN: ${hn}\nเหตุผล: ${label}\nเวลา: ${thaiTime}\n\nระบบจะแจ้งให้ผู้ดูแลตรวจสอบต่อไปครับ`;
         }
@@ -984,10 +997,16 @@ export default async function handler(req: any, res: any) {
           const pending = await findPendingOtherRecord(lineUserId);
           if (pending) {
             const jwt = await getMachineToken();
-            const remark = `บันทึกจาก LINE: อื่นๆ — ${text}`;
+            // ดึง reporter info จาก PENDING marker ที่เก็บไว้
+            const rawRemark: string = pending.rawRemark ?? '';
+            const getField = (key: string) => { const m = rawRemark.match(new RegExp(`${key}=([^|]+)`)); return m ? m[1] : ''; };
+            const reporterName = getField('reporter') || 'เจ้าหน้าที่';
+            const stationName  = getField('station');
+            const remarkParts = [`เหตุผล: อื่นๆ — ${text}`, `ผู้แจ้ง: ${reporterName}`];
+            if (stationName) remarkParts.push(`รพ.สต.: ${stationName}`);
             await axios.put(
               `${FASTAPI_BASE}/patient-follow/${pending.id}`,
-              { follow_status: 'แจ้งข้อมูลผิดพลาด', remark },
+              { follow_status: 'แจ้งข้อมูลผิดพลาด', remark: remarkParts.join(' | ') },
               { headers: { Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json' } }
             ).catch(() => {});
             const thaiTime = new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' });
