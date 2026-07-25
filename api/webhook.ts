@@ -314,6 +314,214 @@ function buildWelcomeFlex(name: string, hcName: string | null) {
   };
 }
 
+// ─── บันทึกข้อมูล flow helpers ────────────────────────────────────────────────
+
+// ดึง Machine token จาก FastAPI
+async function getMachineToken(): Promise<string> {
+  const r = await axios.post(
+    `${FASTAPI_BASE}/token`,
+    new URLSearchParams({ username: 'admin99', password: 'admin99' }),
+    { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+  );
+  return r.data.access_token as string;
+}
+
+// ดึงรายชื่อเคสเร่งด่วน (High Risk + ขาดนัด) ตามพื้นที่ของ user
+async function fetchUrgentPatients(user: UserInfo): Promise<Array<{
+  hn: string; name: string; type: 'hr' | 'ms'; area: string;
+}>> {
+  try {
+    const jwt = await getMachineToken();
+    const authHeader = { Authorization: `Bearer ${jwt}` };
+    const moo = user.moopart?.trim() ?? null;
+    const tmb = user.tmbpart?.trim() ?? null;
+
+    const areaMatch = (p: any) => {
+      const pTmb = p.tmbpart?.trim() ?? null;
+      const pMoo = p.moopart?.trim() ?? null;
+      if (!tmb) return true;
+      if (moo && user.role_id === 5) return pMoo === moo && pTmb === tmb;
+      return pTmb === tmb;
+    };
+
+    // High Risk จาก v-patients
+    const vRes = await axios.get(`${FASTAPI_BASE}/v-patients?limit=500`, { headers: authHeader }).catch(() => null);
+    const allV: any[] = vRes?.data?.items ?? (Array.isArray(vRes?.data) ? vRes.data : []);
+    const highRisk = allV.filter(areaMatch).filter((p: any) => {
+      const s = String(p.smiv_result ?? '').toLowerCase();
+      return s.includes('สีแดง') || s.includes('high') || s.includes('สูง') || s.includes('รุนแรง') || s.includes('severe');
+    }).slice(0, 8).map((p: any) => ({
+      hn: String(p.hn ?? ''),
+      name: String(p.pt_name ?? p.name ?? 'ไม่ทราบชื่อ'),
+      type: 'hr' as const,
+      area: `หมู่ ${p.moopart ?? '-'}`,
+    }));
+
+    // ขาดนัด จาก missed appointment API
+    const MISSED_BASE = process.env.MISSED_APPT_BASE_URL ?? 'http://58.64.14.151/api/v2/public/index.php/api/v1';
+    const MISSED_KEY = process.env.MISSED_APPT_API_KEY ?? '';
+    const fromDate = new Date(); fromDate.setDate(fromDate.getDate() - 90);
+    const toDate = new Date();
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    const missedRes = await axios.get(
+      `${MISSED_BASE}/missed_appointment?nextdate_from=${fmt(fromDate)}&nextdate_to=${fmt(toDate)}&per_page=200&page=1`,
+      { headers: MISSED_KEY ? { Authorization: `Bearer ${MISSED_KEY}` } : {} }
+    ).catch(() => null);
+    const rawMissed = missedRes?.data;
+    const allMissed: any[] = Array.isArray(rawMissed) ? rawMissed : (rawMissed?.data ?? rawMissed?.items ?? []);
+    const seenHns = new Set(highRisk.map(p => p.hn));
+    const missed = allMissed.filter(areaMatch)
+      .filter((p: any) => !seenHns.has(String(p.hn ?? '')))
+      .slice(0, 6)
+      .map((p: any) => ({
+        hn: String(p.hn ?? ''),
+        name: String(p.pt_name ?? p.patient_name ?? p.name ?? 'ไม่ทราบชื่อ'),
+        type: 'ms' as const,
+        area: `หมู่ ${p.moopart ?? '-'}`,
+      }));
+
+    return [...highRisk, ...missed].slice(0, 12); // LINE Carousel สูงสุด 12 bubbles
+  } catch {
+    return [];
+  }
+}
+
+// สร้าง Flex Carousel แสดงรายชื่อผู้ป่วย
+function buildPatientListFlex(
+  patients: Array<{ hn: string; name: string; type: 'hr' | 'ms'; area: string }>
+) {
+  if (patients.length === 0) {
+    return { type: 'text', text: '✅ ขณะนี้ไม่มีเคสเร่งด่วนที่ต้องติดตามในพื้นที่ของท่านครับ' };
+  }
+
+  const bubbles = patients.map(p => {
+    const isHR = p.type === 'hr';
+    const headerBg = isHR ? '#991B1B' : '#92400E';
+    const typeLabel = isHR ? '🔴 High Risk' : '📅 ขาดนัด';
+    // limit name to 15 chars to stay well under 300-byte postback limit
+    const shortName = encodeURIComponent(p.name.slice(0, 15));
+    const postbackData = `action=select_patient&hn=${p.hn}&nm=${shortName}&tp=${p.type}`;
+    return {
+      type: 'bubble',
+      size: 'micro',
+      header: {
+        type: 'box', layout: 'vertical', backgroundColor: headerBg, paddingAll: '8px',
+        contents: [{ type: 'text', text: typeLabel, color: '#fff', size: 'xs', weight: 'bold' }],
+      },
+      body: {
+        type: 'box', layout: 'vertical', paddingAll: '10px', spacing: 'xs',
+        contents: [
+          { type: 'text', text: p.name, size: 'sm', weight: 'bold', wrap: true, color: '#1e293b', maxLines: 2 },
+          { type: 'text', text: `HN: ${p.hn}`, size: 'xxs', color: '#64748b' },
+          { type: 'text', text: p.area, size: 'xxs', color: '#64748b', wrap: true },
+        ],
+      },
+      footer: {
+        type: 'box', layout: 'vertical', paddingAll: '8px',
+        contents: [{
+          type: 'button', style: 'primary', color: headerBg, height: 'sm',
+          action: {
+            type: 'postback', label: 'เลือก',
+            data: postbackData,
+            displayText: `เลือก: ${p.name.slice(0, 20)}`,
+          },
+        }],
+      },
+    };
+  });
+
+  return {
+    type: 'flex',
+    altText: `เคสเร่งด่วน ${patients.length} ราย — กดเลือกรายชื่อเพื่อบันทึกข้อมูล`,
+    contents: { type: 'carousel', contents: bubbles },
+  };
+}
+
+// สร้าง Flex เมนูเลือกช่องทางบันทึกสำหรับผู้ป่วยที่เลือก
+function buildPatientActionFlex(hn: string, name: string, caseType: string) {
+  const isHR = caseType === 'hr';
+  const typeLabel = isHR ? '🔴 เสี่ยงสูง' : '📅 ขาดนัด';
+  return {
+    type: 'flex',
+    altText: `บันทึกข้อมูล: ${name}`,
+    contents: {
+      type: 'bubble',
+      size: 'kilo',
+      header: {
+        type: 'box', layout: 'vertical', backgroundColor: '#1a3d6b', paddingAll: '14px',
+        contents: [
+          { type: 'text', text: '📝 เลือกช่องทางบันทึก', color: '#ffffff', weight: 'bold', size: 'sm' },
+        ],
+      },
+      body: {
+        type: 'box', layout: 'vertical', paddingAll: '14px', spacing: 'sm',
+        contents: [
+          { type: 'text', text: name, weight: 'bold', size: 'md', color: '#1e293b', wrap: true },
+          { type: 'text', text: `HN: ${hn}  ·  ${typeLabel}`, size: 'xs', color: '#64748b' },
+          { type: 'separator', margin: 'md' },
+          {
+            type: 'text', text: 'เลือกช่องทางบันทึกการติดตาม:', size: 'xs', color: '#475569',
+            wrap: true, margin: 'md',
+          },
+        ],
+      },
+      footer: {
+        type: 'box', layout: 'vertical', paddingAll: '12px', spacing: 'sm',
+        contents: [
+          {
+            type: 'button', style: 'primary', color: '#16a34a', height: 'sm',
+            action: {
+              type: 'postback', label: '✅ ติดตามเรียบร้อยแล้ว',
+              data: `action=follow_done&hn=${hn}`,
+              displayText: `✅ บันทึกว่าติดตาม ${name.slice(0, 15)} เรียบร้อยแล้ว`,
+            },
+          },
+          {
+            type: 'button', style: 'secondary', height: 'sm',
+            action: {
+              type: 'uri', label: '🧡 บันทึกผ่าน V-CARE',
+              uri: 'https://vcare.jvkorat.go.th/smiv/login',
+            },
+          },
+          {
+            type: 'button', style: 'secondary', height: 'sm',
+            action: {
+              type: 'uri', label: '💙 บันทึกผ่าน SafeMind',
+              uri: `${liffBase}/save?hn=${encodeURIComponent(hn)}`,
+            },
+          },
+          {
+            type: 'button', style: 'secondary', height: 'sm',
+            action: {
+              type: 'postback', label: '❌ ไม่ใช่เคสในเขต',
+              data: `action=wrong_area&hn=${hn}`,
+              displayText: `❌ แจ้งว่า ${name.slice(0, 15)} ไม่ใช่เคสในเขต`,
+            },
+          },
+        ],
+      },
+    },
+  };
+}
+
+// บันทึก patient-follow ผ่าน Machine token
+async function recordPatientFollow(hn: string, followStatus: string, remark: string): Promise<boolean> {
+  try {
+    const jwt = await getMachineToken();
+    const today = new Date().toISOString().slice(0, 10);
+    await axios.post(
+      `${FASTAPI_BASE}/patient-follow`,
+      { hn, follow_status: followStatus, follow_date: today, remark, created_date: today },
+      { headers: { Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json' } }
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// ─── end บันทึกข้อมูล helpers ─────────────────────────────────────────────────
+
 // Flex สำหรับคนที่ยังไม่ได้ลงทะเบียน
 function buildRegisterFlex() {
   return {
@@ -518,6 +726,78 @@ export default async function handler(req: any, res: any) {
 
     // Process each event
     for (const event of events) {
+      // Handle postback: record_visit — ดึงรายชื่อเคสเร่งด่วนและแสดงเป็น Flex Carousel
+      if (event.type === 'postback' && event.postback?.data === 'action=record_visit') {
+        const lineUserId: string = event.source?.userId;
+        const user = lineUserId ? await getUserByLineId(lineUserId) : null;
+        let replyMessages: any[];
+        if (!user) {
+          replyMessages = [{ type: 'text', text: '⚠️ ไม่พบข้อมูลบัญชีในระบบ กรุณาติดต่อผู้ดูแลระบบครับ' }];
+        } else {
+          const patients = await fetchUrgentPatients(user);
+          const listFlex = buildPatientListFlex(patients);
+          const stationName = user.station_name ?? user.health_center_name ?? 'พื้นที่ของท่าน';
+          replyMessages = patients.length > 0
+            ? [
+                { type: 'text', text: `📋 เคสเร่งด่วนใน${stationName}: ${patients.length} ราย\nกดเลือกรายชื่อเพื่อบันทึกข้อมูลครับ` },
+                listFlex,
+              ]
+            : [listFlex];
+        }
+        await axios.post(
+          'https://api.line.me/v2/bot/message/reply',
+          { replyToken: event.replyToken, messages: replyMessages },
+          { headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${lineToken}` } }
+        ).catch((e: any) => console.warn('reply record_visit failed:', e.response?.data || e.message));
+        continue;
+      }
+
+      // Handle postback: select_patient — แสดง Action Menu 4 ปุ่ม
+      if (event.type === 'postback' && (event.postback?.data ?? '').startsWith('action=select_patient')) {
+        const params = new URLSearchParams(event.postback.data);
+        const hn = params.get('hn') ?? '';
+        const name = decodeURIComponent(params.get('nm') ?? 'ผู้ป่วย');
+        const caseType = params.get('tp') ?? 'hr';
+        const actionFlex = buildPatientActionFlex(hn, name, caseType);
+        await axios.post(
+          'https://api.line.me/v2/bot/message/reply',
+          { replyToken: event.replyToken, messages: [actionFlex] },
+          { headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${lineToken}` } }
+        ).catch((e: any) => console.warn('reply select_patient failed:', e.response?.data || e.message));
+        continue;
+      }
+
+      // Handle postback: follow_done — บันทึกว่าติดตามสำเร็จ → POST /patient-follow status=success
+      if (event.type === 'postback' && (event.postback?.data ?? '').startsWith('action=follow_done')) {
+        const params = new URLSearchParams(event.postback.data);
+        const hn = params.get('hn') ?? '';
+        const ok = await recordPatientFollow(hn, 'success', 'บันทึกจาก LINE: ติดตามเรียบร้อยแล้ว');
+        const thaiTime = new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' });
+        const msg = ok
+          ? `✅ บันทึกเรียบร้อยแล้วครับ!\n\nHN: ${hn}\nสถานะ: ติดตามสำเร็จ\nเวลา: ${thaiTime}`
+          : `✅ รับทราบแล้วครับ\nHN: ${hn} — บันทึกไม่สำเร็จ กรุณาแจ้งผู้ดูแลระบบ`;
+        await axios.post(
+          'https://api.line.me/v2/bot/message/reply',
+          { replyToken: event.replyToken, messages: [{ type: 'text', text: msg }] },
+          { headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${lineToken}` } }
+        ).catch((e: any) => console.warn('reply follow_done failed:', e.response?.data || e.message));
+        continue;
+      }
+
+      // Handle postback: wrong_area — แจ้งว่าไม่ใช่เคสในเขต → POST /patient-follow status=แจ้งข้อมูลผิดพลาด
+      if (event.type === 'postback' && (event.postback?.data ?? '').startsWith('action=wrong_area')) {
+        const params = new URLSearchParams(event.postback.data);
+        const hn = params.get('hn') ?? '';
+        await recordPatientFollow(hn, 'แจ้งข้อมูลผิดพลาด', 'บันทึกจาก LINE: ไม่ใช่เคสในเขตความรับผิดชอบ');
+        const msg = `📝 รับทราบแล้วครับ\n\nHN: ${hn} ถูกบันทึกว่า "ไม่ใช่เคสในเขต"\nและแจ้งข้อมูลไปยังผู้ดูแลระบบแล้ว\n\nขอบคุณที่แจ้งให้ทราบครับ`;
+        await axios.post(
+          'https://api.line.me/v2/bot/message/reply',
+          { replyToken: event.replyToken, messages: [{ type: 'text', text: msg }] },
+          { headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${lineToken}` } }
+        ).catch((e: any) => console.warn('reply wrong_area failed:', e.response?.data || e.message));
+        continue;
+      }
+
       // Handle postback — ตารางบริการ
       if (event.type === 'postback' && event.postback?.data === 'action=schedule_menu') {
         await axios.post(
