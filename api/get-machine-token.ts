@@ -6,7 +6,7 @@ export default async function handler(req: any, res: any) {
     }
 
     try {
-        const response = await fetch("http://210.246.215.95:8000/token", {
+        const response = await fetch("http://210.246.215.95:8008/token", {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded'

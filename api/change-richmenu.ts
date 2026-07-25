@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const FASTAPI = "http://210.246.215.95:8000";
+const FASTAPI = "http://210.246.215.95:8008";
 const RICHMENU_ID = 'richmenu-4346f6ab2b688b71be97175b7121297d';
 
 export default async function handler(req: any, res: any) {

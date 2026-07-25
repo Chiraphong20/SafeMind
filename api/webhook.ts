@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const FASTAPI_BASE = "http://210.246.215.95:8000";
+const FASTAPI_BASE = "http://210.246.215.95:8008";
 const LIFF_ID = '2009105092-WldkRhqH';
 const liffBase = `https://liff.line.me/${LIFF_ID}`;
 

@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const FASTAPI = "http://210.246.215.95:8000";
+const FASTAPI = "http://210.246.215.95:8008";
 
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', '*');

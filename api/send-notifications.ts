@@ -5,7 +5,7 @@
  */
 import axios from 'axios';
 
-const FASTAPI = 'http://210.246.215.95:8000';
+const FASTAPI = 'http://210.246.215.95:8008';
 const LIFF_ID = '2009105092-WldkRhqH';
 const LIFF_BASE = `https://liff.line.me/${LIFF_ID}`;
 const ROLE_VHV = 5;
