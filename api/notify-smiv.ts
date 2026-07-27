@@ -1,6 +1,6 @@
-import axios from 'axios';
+﻿import axios from 'axios';
 
-const FASTAPI_BASE = "http://210.246.215.95:8008";
+const FASTAPI_BASE = "https://safemind-ai.net/api";
 const LIFF_BASE = "https://liff.line.me/2009105092-WldkRhqH";
 
 export interface SmivPatient {

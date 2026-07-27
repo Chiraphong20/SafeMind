@@ -1,4 +1,4 @@
-const FASTAPI = "http://210.246.215.95:8008";
+﻿const FASTAPI = "https://safemind-ai.net/api";
 
 async function getAdminToken(): Promise<string> {
   const res = await fetch(`${FASTAPI}/token`, {

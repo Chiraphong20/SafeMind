@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+﻿import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
@@ -9,7 +9,7 @@ export default defineConfig({
     allowedHosts: true, // ✅ อนุญาตทุก Host ทันที
     proxy: {
       '/api/fastapi': {
-        target: 'http://210.246.215.95:8000',
+        target: 'https://safemind-ai.net/api',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/fastapi/, '')
       },

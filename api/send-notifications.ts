@@ -1,11 +1,11 @@
-/**
+﻿/**
  * Smart Notification — Push LINE Flex ให้ VHV ตามผู้ป่วยในพื้นที่
  * POST /api/send-notifications
  * Body: { secret: string }  ← ป้องกันไม่ให้ใครเรียกโดยพลการ
  */
 import axios from 'axios';
 
-const FASTAPI = 'http://210.246.215.95:8008';
+const FASTAPI = 'https://safemind-ai.net/api';
 const LIFF_ID = '2009105092-WldkRhqH';
 const LIFF_BASE = `https://liff.line.me/${LIFF_ID}`;
 const ROLE_VHV = 5;
