@@ -1,5 +1,4 @@
-﻿{
-  "devCommand": "vite",
+{
   "headers": [
     {
       "source": "/api/(.*)",
@@ -16,8 +15,8 @@
       "destination": "https://safemind-ai.net/api/:path*"
     },
     {
-      "source": "/((?!api/|static/|@vite/|@react-refresh|node_modules/|src/|.*\\..*).*)",
-      "destination": "/"
+      "source": "/:path*",
+      "destination": "/index.html"
     }
   ]
 }
