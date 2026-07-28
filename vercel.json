@@ -19,11 +19,5 @@
       "source": "/((?!api/|static/|@vite/|@react-refresh|node_modules/|src/|.*\\..*).*)",
       "destination": "/"
     }
-  ],
-  "crons": [
-    {
-      "path": "/api/cron/check-high-risk",
-      "schedule": "0 8 * * *"
-    }
   ]
 }
