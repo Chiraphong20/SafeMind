@@ -1,4 +1,4 @@
-﻿import axios from 'axios';
+import axios from 'axios';
 
 const FASTAPI_BASE = "https://safemind-ai.net/api";
 const LIFF_BASE = "https://liff.line.me/2009105092-WldkRhqH";
@@ -7,11 +7,14 @@ export interface SmivPatient {
   hn: string;
   pt_name: string;
   result?: string;
+  result_code?: string;
   tmbpart?: string;
   moopart?: string;
   amppart?: string;
   chwpart?: string;
   phone?: string;
+  latitude?: string | number;
+  longitude?: string | number;
   entry_date?: string;
   nextdate?: string;
   app_cause?: string;
@@ -24,87 +27,76 @@ const TAMBON_NAMES: Record<string, string> = {
   '10': 'หนองน้ำแดง','11': 'วังไทร', '12': 'พญาเย็น',
 };
 
-function buildAreaSummaryFlex(
-  tmbpart: string,
-  patients: SmivPatient[],
-  type: 'high-risk' | 'missed-appointment'
+function formatThaiDate(dateStr?: string | null): string {
+  if (!dateStr) return '-';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  const thYear = d.getFullYear() + 543;
+  const months = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  return `${d.getDate()} ${months[d.getMonth()]} ${thYear}`;
+}
+
+function infoRow(label: string, value: string, valueColor = '#1a202c'): object {
+  return {
+    type: 'box',
+    layout: 'horizontal',
+    paddingTop: '5px',
+    paddingBottom: '5px',
+    contents: [
+      { type: 'text', text: label, size: 'xs', color: '#888888', flex: 3 },
+      { type: 'text', text: value || '-', size: 'xs', color: valueColor, weight: 'bold', flex: 5, wrap: true },
+    ],
+  };
+}
+
+function separator(): object {
+  return { type: 'separator', color: '#f1f5f9' };
+}
+
+function buildPatientBubble(
+  p: SmivPatient,
+  type: 'high-risk' | 'missed-appointment',
 ): object {
   const isHighRisk = type === 'high-risk';
   const headerColor = isHighRisk ? '#C62828' : '#B45309';
   const headerEmoji = isHighRisk ? '⚠️' : '🔔';
-  const headerTitle = isHighRisk ? 'แจ้งเตือน กลุ่มเสี่ยงสูง (สีแดง)' : 'แจ้งเตือน ผู้ป่วยขาดนัด';
-  const tmbName = TAMBON_NAMES[tmbpart] ?? `ตำบล ${tmbpart}`;
+  const headerTitle = isHighRisk ? 'แจ้งเตือน กลุ่มเสี่ยงสูง' : 'แจ้งเตือน ผู้ป่วยขาดนัด';
 
-  const MAX_SHOW = 15;
-  const shown = patients.slice(0, MAX_SHOW);
-  const extra = patients.length - shown.length;
+  const tmbName = TAMBON_NAMES[p.tmbpart ?? ''] ?? p.tmbpart ?? '-';
+  const location = tmbName !== '-'
+    ? `ต.${tmbName} หมู่ ${p.moopart ?? '-'}`
+    : p.moopart ? `หมู่ ${p.moopart}` : '-';
 
-  const patientRows = shown.flatMap((p, i): object[] => {
-    const moo = p.moopart ? ` หมู่ ${p.moopart}` : '';
-    const rowBg = i % 2 === 0 ? '#FEF2F2' : '#FFFFFF';
-    return [
-      {
-        type: 'box',
-        layout: 'vertical',
-        margin: i === 0 ? 'none' : 'sm',
-        paddingAll: '8px',
-        backgroundColor: rowBg,
-        cornerRadius: '6px',
-        contents: [
-          {
-            type: 'box',
-            layout: 'horizontal',
-            contents: [
-              {
-                type: 'text',
-                text: `${i + 1}.`,
-                size: 'xs',
-                color: headerColor,
-                weight: 'bold',
-                flex: 0,
-              },
-              {
-                type: 'text',
-                text: p.pt_name || '-',
-                size: 'xs',
-                weight: 'bold',
-                color: '#1a202c',
-                flex: 1,
-                margin: 'sm',
-                wrap: true,
-              },
-            ],
-          },
-          {
-            type: 'text',
-            text: `HN: ${p.hn}${moo}`,
-            size: 'xxs',
-            color: '#64748b',
-            margin: 'xs',
-          },
-        ],
-      },
-    ];
-  });
+  const displayDate = formatThaiDate(p.entry_date);
+  const dateLabel = 'วันประเมิน';
 
-  if (extra > 0) {
-    patientRows.push({
-      type: 'text',
-      text: `…และอีก ${extra} ราย ดูเพิ่มเติมในระบบ`,
-      size: 'xxs',
-      color: '#94a3b8',
-      margin: 'sm',
-      align: 'center',
-    } as object);
-  }
+  const resultColor = (p.result ?? '').includes('แดง') ? '#C62828'
+    : (p.result ?? '').includes('เหลือง') ? '#B45309'
+    : (p.result ?? '').includes('เขียว') ? '#15803d'
+    : '#1a202c';
+
+  // phone button
+  const phone = (p.phone ?? '').replace(/\s/g, '');
+  const callUri = phone
+    ? `tel:${phone}`
+    : `${LIFF_BASE}/patient-detail?hn=${encodeURIComponent(p.hn)}`;
+
+  // navigation button
+  const lat = p.latitude ? String(p.latitude) : '';
+  const lon = p.longitude ? String(p.longitude) : '';
+  const mapsUri = (lat && lon && lat !== '0' && lon !== '0')
+    ? `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`
+    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((p.pt_name ?? '') + ' ต.' + tmbName + ' อ.ปากช่อง')}`;
+
+  const saveUri = `${LIFF_BASE}/save?hn=${encodeURIComponent(p.hn)}`;
 
   return {
     type: 'bubble',
-    size: 'mega',
+    size: 'kilo',
     header: {
       type: 'box',
       layout: 'vertical',
-      paddingAll: '14px',
+      paddingAll: '12px',
       backgroundColor: headerColor,
       contents: [
         {
@@ -114,29 +106,6 @@ function buildAreaSummaryFlex(
           color: '#FFFFFF',
           size: 'sm',
         },
-        {
-          type: 'box',
-          layout: 'horizontal',
-          margin: 'xs',
-          contents: [
-            {
-              type: 'text',
-              text: `ต.${tmbName} · อ.ปากช่อง`,
-              color: '#ffcccc',
-              size: 'xs',
-              flex: 1,
-            },
-            {
-              type: 'text',
-              text: `${patients.length} ราย`,
-              color: '#fde68a',
-              size: 'xs',
-              weight: 'bold',
-              align: 'end',
-              flex: 0,
-            },
-          ],
-        },
       ],
     },
     body: {
@@ -144,13 +113,104 @@ function buildAreaSummaryFlex(
       layout: 'vertical',
       paddingAll: '12px',
       spacing: 'none',
-      contents: patientRows,
+      contents: [
+        infoRow('ชื่อ-สกุล', p.pt_name ?? '-'),
+        separator(),
+        infoRow('เลข HN', p.hn),
+        separator(),
+        infoRow('พิกัด', location),
+        separator(),
+        infoRow('สถานะ', p.result ?? '-', resultColor),
+        separator(),
+        infoRow('ประวัติ', p.result_code ?? p.result ?? '-', resultColor),
+        separator(),
+        infoRow(dateLabel, displayDate),
+        separator(),
+        infoRow('เบอร์โทรศัพท์', p.phone ?? '-'),
+      ],
     },
     footer: {
       type: 'box',
       layout: 'vertical',
-      paddingAll: '12px',
+      paddingAll: '10px',
       spacing: 'sm',
+      contents: [
+        {
+          type: 'button',
+          style: 'primary',
+          height: 'sm',
+          color: headerColor,
+          action: { type: 'uri', label: '📞 โทรหาผู้ป่วย/ญาติ', uri: callUri },
+        },
+        {
+          type: 'button',
+          style: 'secondary',
+          height: 'sm',
+          action: { type: 'uri', label: '🗺️ นำทางลงพื้นที่เยี่ยมบ้าน', uri: mapsUri },
+        },
+        {
+          type: 'button',
+          style: 'secondary',
+          height: 'sm',
+          action: { type: 'uri', label: '📝 บันทึกข้อมูลติดตาม', uri: saveUri },
+        },
+      ],
+    },
+  };
+}
+
+function buildSummaryBubble(
+  tmbpart: string,
+  total: number,
+  shown: number,
+  type: 'high-risk' | 'missed-appointment',
+): object {
+  const isHighRisk = type === 'high-risk';
+  const headerColor = isHighRisk ? '#C62828' : '#B45309';
+  const tmbName = TAMBON_NAMES[tmbpart] ?? `ตำบล ${tmbpart}`;
+  const remaining = total - shown;
+
+  return {
+    type: 'bubble',
+    size: 'kilo',
+    body: {
+      type: 'box',
+      layout: 'vertical',
+      paddingAll: '16px',
+      justifyContent: 'center',
+      contents: [
+        {
+          type: 'text',
+          text: `ต.${tmbName}`,
+          weight: 'bold',
+          size: 'sm',
+          color: headerColor,
+          align: 'center',
+        },
+        {
+          type: 'text',
+          text: `ทั้งหมด ${total} ราย`,
+          size: 'xl',
+          weight: 'bold',
+          color: '#1a202c',
+          align: 'center',
+          margin: 'sm',
+        },
+        ...(remaining > 0 ? [{
+          type: 'text',
+          text: `แสดง ${shown} ราย\nกดดูทั้งหมดในระบบ`,
+          size: 'xs',
+          color: '#888888',
+          align: 'center',
+          margin: 'sm',
+          wrap: true,
+        }] : []),
+      ],
+    },
+    footer: {
+      type: 'box',
+      layout: 'vertical',
+      paddingAll: '10px',
       contents: [
         {
           type: 'button',
@@ -159,23 +219,30 @@ function buildAreaSummaryFlex(
           color: headerColor,
           action: {
             type: 'uri',
-            label: '📋 ดูรายชื่อผู้ป่วยในระบบ',
+            label: '📋 ดูรายชื่อทั้งหมดในระบบ',
             uri: `${LIFF_BASE}/patient-check?tmbpart=${encodeURIComponent(tmbpart)}`,
-          },
-        },
-        {
-          type: 'button',
-          style: 'secondary',
-          height: 'sm',
-          action: {
-            type: 'uri',
-            label: '📝 บันทึกการเยี่ยมบ้าน',
-            uri: `${LIFF_BASE}/save`,
           },
         },
       ],
     },
   };
+}
+
+const MAX_PER_CAROUSEL = 10;
+
+function buildCarousel(
+  tmbpart: string,
+  patients: SmivPatient[],
+  type: 'high-risk' | 'missed-appointment',
+): object {
+  const shown = patients.slice(0, MAX_PER_CAROUSEL);
+  const patientBubbles = shown.map((p) => buildPatientBubble(p, type));
+
+  // Always append a summary bubble
+  const summaryBubble = buildSummaryBubble(tmbpart, patients.length, shown.length, type);
+  const bubbles = [...patientBubbles, summaryBubble];
+
+  return { type: 'carousel', contents: bubbles };
 }
 
 export default async function handler(req: any, res: any) {
@@ -240,21 +307,15 @@ export default async function handler(req: any, res: any) {
 
     let totalSent = 0;
 
-    // สร้าง messages ทุก tmbpart ก่อน
-    const allMessages: { tmbpart: string; flex: object }[] = [];
+    // Build carousel per tmbpart
+    const allMessages: { tmbpart: string; carousel: object }[] = [];
     for (const [tmbpart, group] of Object.entries(buckets)) {
       if (tmbpart === '__no_area__') continue;
-      allMessages.push({
-        tmbpart,
-        flex: buildAreaSummaryFlex(tmbpart, group, type),
-      });
+      allMessages.push({ tmbpart, carousel: buildCarousel(tmbpart, group, type) });
     }
 
     for (const user of activeUsers) {
       const uTmb = (user.tmbpart ?? '').trim();
-
-      // ถ้า user มี tmbpart ตั้งไว้ → ส่งเฉพาะพื้นที่นั้น
-      // ถ้า user ไม่มี tmbpart (null/ว่าง) → ส่งทุกพื้นที่ (broadcast)
       const msgToSend = uTmb
         ? allMessages.filter(m => m.tmbpart === uTmb)
         : allMessages;
@@ -263,7 +324,10 @@ export default async function handler(req: any, res: any) {
         try {
           await axios.post(
             'https://api.line.me/v2/bot/message/push',
-            { to: user.line_user_id, messages: [{ type: 'flex', altText, contents: msg.flex }] },
+            {
+              to: user.line_user_id,
+              messages: [{ type: 'flex', altText, contents: msg.carousel }],
+            },
             { headers: lineHeaders }
           );
           totalSent++;
