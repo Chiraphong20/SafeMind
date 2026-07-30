@@ -75,9 +75,9 @@ function buildPatientBubble(
     : (p.result ?? '').includes('เขียว') ? '#15803d'
     : '#1a202c';
 
-  // ขาดนัด: โชว์จำนวนวันขาดนัดแทนสี, ไม่ต้องมีประวัติ/วันประเมิน
+  // ขาดนัด: โชว์จำนวนวันขาดนัดแทนสี
   const statusValue = isHighRisk
-    ? (p.result ?? '-')
+    ? formatResultCode(p.result_code ?? p.result)
     : `ขาดนัด ${p.missed_days ?? '-'} วัน`;
   const statusColor = isHighRisk ? resultColor : headerColor;
 
@@ -95,9 +95,8 @@ function buildPatientBubble(
     : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((p.pt_name ?? '') + ' ต.' + tmbName + ' อ.ปากช่อง')}`;
 
   const saveUri = `${LIFF_BASE}/save?hn=${encodeURIComponent(p.hn)}`;
-  // เปิดหน้าประวัติผู้ป่วยที่มีอยู่แล้ว (แท็บ Timeline เริ่มต้น มีประวัติ Admit IPD/Visit OPD จาก PNNH)
-  // แทนที่จะยิง API ต่อ HN ตอนส่งข้อความ (ทำให้ส่งช้าเมื่อมีผู้ป่วยเยอะ)
-  const historyUri = `${LIFF_BASE}/patients/${encodeURIComponent(p.hn)}`;
+  // หน้าประวัติ Admit IPD/Visit OPD เฉพาะของผู้ป่วยรายนี้ (โหลดตอนกดปุ่มเท่านั้น ไม่ต้องยิง API ตอนส่งข้อความ)
+  const historyUri = `${LIFF_BASE}/patients/history?hn=${encodeURIComponent(p.hn)}`;
 
   return {
     type: 'bubble',
@@ -131,10 +130,6 @@ function buildPatientBubble(
         separator(),
         infoRow('สถานะ', statusValue, statusColor),
         separator(),
-        ...(isHighRisk ? [
-          infoRow('ประวัติ', formatResultCode(p.result_code ?? p.result), resultColor),
-          separator(),
-        ] : []),
         infoRow('เบอร์โทรศัพท์', p.phone ?? '-'),
       ],
     },
