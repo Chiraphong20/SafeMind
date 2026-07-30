@@ -18,6 +18,7 @@ export interface SmivPatient {
   entry_date?: string;
   nextdate?: string;
   app_cause?: string;
+  missed_days?: number;
 }
 
 const TAMBON_NAMES: Record<string, string> = {
@@ -30,7 +31,7 @@ const TAMBON_NAMES: Record<string, string> = {
 function formatThaiDate(dateStr?: string | null): string {
   if (!dateStr) return '-';
   const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return dateStr;
+  if (isNaN(d.getTime()) || d.getFullYear() < 1900) return '-';
   const thYear = d.getFullYear() + 543;
   const months = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
   return `${d.getDate()} ${months[d.getMonth()]} ${thYear}`;
@@ -74,6 +75,12 @@ function buildPatientBubble(
     : (p.result ?? '').includes('เหลือง') ? '#B45309'
     : (p.result ?? '').includes('เขียว') ? '#15803d'
     : '#1a202c';
+
+  // ขาดนัด: โชว์จำนวนวันขาดนัดแทนสี, ไม่ต้องมีประวัติ/วันประเมิน
+  const statusValue = isHighRisk
+    ? (p.result ?? '-')
+    : `ขาดนัด ${p.missed_days ?? '-'} วัน`;
+  const statusColor = isHighRisk ? resultColor : headerColor;
 
   // phone button
   const phone = (p.phone ?? '').replace(/\s/g, '');
@@ -120,12 +127,14 @@ function buildPatientBubble(
         separator(),
         infoRow('พิกัด', location),
         separator(),
-        infoRow('สถานะ', p.result ?? '-', resultColor),
+        infoRow('สถานะ', statusValue, statusColor),
         separator(),
-        infoRow('ประวัติ', p.result_code ?? p.result ?? '-', resultColor),
-        separator(),
-        infoRow(dateLabel, displayDate),
-        separator(),
+        ...(isHighRisk ? [
+          infoRow('ประวัติ', p.result_code ?? p.result ?? '-', resultColor),
+          separator(),
+          infoRow(dateLabel, displayDate),
+          separator(),
+        ] : []),
         infoRow('เบอร์โทรศัพท์', p.phone ?? '-'),
       ],
     },
