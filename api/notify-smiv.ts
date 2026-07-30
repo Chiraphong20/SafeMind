@@ -19,6 +19,8 @@ export interface SmivPatient {
   nextdate?: string;
   app_cause?: string;
   missed_days?: number;
+  /** รพ.สต. ที่แท้จริงของผู้ป่วย (resolved จาก frontend ด้วย village_list) — ใช้กำหนดผู้รับแทนตำบล */
+  health_center_id?: number;
 }
 
 const TAMBON_NAMES: Record<string, string> = {
@@ -302,10 +304,14 @@ export default async function handler(req: any, res: any) {
       u.role_id === roleFilter && u.is_active && u.line_user_id && isRealLineId(u.line_user_id)
     );
 
-    // Group patients by tmbpart
+    // จัดกลุ่มผู้ป่วยตาม รพ.สต. จริง (health_center_id) เป็นหลัก — ไม่ใช่ตำบล
+    // เพราะ 1 ตำบลอาจมีหลาย รพ.สต. ถ้า route ตามตำบลอย่างเดียวจะส่งข้ามไปให้ รพ.สต. อื่นในตำบลเดียวกันด้วย
+    // เก็บ fallback เป็นตำบลไว้เฉพาะเคสที่ frontend resolve รพ.สต. ไม่ได้ (ข้อมูลเก่า/ไม่มี health_center_id)
     const buckets: Record<string, SmivPatient[]> = {};
     for (const p of patients) {
-      const key = (p.tmbpart ?? '').trim() || '__no_area__';
+      const key = p.health_center_id != null
+        ? `hc:${p.health_center_id}`
+        : `tmb:${(p.tmbpart ?? '').trim() || '__no_area__'}`;
       if (!buckets[key]) buckets[key] = [];
       buckets[key].push(p);
     }
@@ -316,18 +322,25 @@ export default async function handler(req: any, res: any) {
 
     let totalSent = 0;
 
-    // Build carousel per tmbpart
-    const allMessages: { tmbpart: string; carousel: object }[] = [];
-    for (const [tmbpart, group] of Object.entries(buckets)) {
-      if (tmbpart === '__no_area__') continue;
-      allMessages.push({ tmbpart, carousel: buildCarousel(tmbpart, group, type) });
+    // Build carousel ต่อ bucket (แสดงตำบลของผู้ป่วยคนแรกในกลุ่มไว้เป็น header เท่านั้น ไม่เกี่ยวกับการ route)
+    const allMessages: { key: string; carousel: object }[] = [];
+    for (const [key, group] of Object.entries(buckets)) {
+      if (key === 'tmb:__no_area__') continue;
+      const displayTmb = (group[0]?.tmbpart ?? '').trim();
+      allMessages.push({ key, carousel: buildCarousel(displayTmb, group, type) });
     }
 
     for (const user of activeUsers) {
+      const uHcId = user.health_center_id != null ? Number(user.health_center_id) : null;
       const uTmb = (user.tmbpart ?? '').trim();
-      const msgToSend = uTmb
-        ? allMessages.filter(m => m.tmbpart === uTmb)
-        : allMessages;
+      const msgToSend = allMessages.filter((m) => {
+        if (m.key.startsWith('hc:')) {
+          // เคส resolve รพ.สต. ได้แล้ว — ต้องตรงกับ รพ.สต. ของ user เป๊ะๆ เท่านั้น ห้ามใช้ตำบลช่วยจับคู่
+          return uHcId != null && m.key === `hc:${uHcId}`;
+        }
+        // fallback ตำบล (ไม่มี health_center_id ให้ resolve) — จับคู่แบบเดิม
+        return uTmb ? m.key === `tmb:${uTmb}` : true;
+      });
 
       for (const msg of msgToSend) {
         try {
