@@ -30,13 +30,13 @@ const TAMBON_NAMES: Record<string, string> = {
   '10': 'หนองน้ำแดง','11': 'วังไทร', '12': 'พญาเย็น',
 };
 
-function formatThaiDate(dateStr?: string | null): string {
-  if (!dateStr) return '-';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime()) || d.getFullYear() < 1900) return '-';
-  const thYear = d.getFullYear() + 543;
-  const months = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-  return `${d.getDate()} ${months[d.getMonth()]} ${thYear}`;
+function formatResultCode(code?: string | null): string {
+  const c = (code ?? '').trim().toUpperCase();
+  if (c === 'RED') return '(สีแดง) ยังไม่ได้ติดตาม';
+  if (c === 'YELLOW') return '(สีเหลือง) ยังไม่ได้ติดตาม';
+  if (c === 'GREEN') return '(สีเขียว) ยังไม่ได้ติดตาม';
+  if (c === 'ORANGE') return '(สีส้ม) ยังไม่ได้ติดตาม';
+  return code ?? '-';
 }
 
 function infoRow(label: string, value: string, valueColor = '#1a202c'): object {
@@ -70,9 +70,6 @@ function buildPatientBubble(
     ? `ต.${tmbName} หมู่ ${p.moopart ?? '-'}`
     : p.moopart ? `หมู่ ${p.moopart}` : '-';
 
-  const displayDate = formatThaiDate(p.entry_date);
-  const dateLabel = 'วันประเมิน';
-
   const resultColor = (p.result ?? '').includes('แดง') ? '#C62828'
     : (p.result ?? '').includes('เหลือง') ? '#B45309'
     : (p.result ?? '').includes('เขียว') ? '#15803d'
@@ -98,6 +95,9 @@ function buildPatientBubble(
     : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((p.pt_name ?? '') + ' ต.' + tmbName + ' อ.ปากช่อง')}`;
 
   const saveUri = `${LIFF_BASE}/save?hn=${encodeURIComponent(p.hn)}`;
+  // เปิดหน้าประวัติผู้ป่วยที่มีอยู่แล้ว (แท็บ Timeline เริ่มต้น มีประวัติ Admit IPD/Visit OPD จาก PNNH)
+  // แทนที่จะยิง API ต่อ HN ตอนส่งข้อความ (ทำให้ส่งช้าเมื่อมีผู้ป่วยเยอะ)
+  const historyUri = `${LIFF_BASE}/patients/${encodeURIComponent(p.hn)}`;
 
   return {
     type: 'bubble',
@@ -132,9 +132,7 @@ function buildPatientBubble(
         infoRow('สถานะ', statusValue, statusColor),
         separator(),
         ...(isHighRisk ? [
-          infoRow('ประวัติ', p.result_code ?? p.result ?? '-', resultColor),
-          separator(),
-          infoRow(dateLabel, displayDate),
+          infoRow('ประวัติ', formatResultCode(p.result_code ?? p.result), resultColor),
           separator(),
         ] : []),
         infoRow('เบอร์โทรศัพท์', p.phone ?? '-'),
@@ -165,6 +163,12 @@ function buildPatientBubble(
           height: 'sm',
           action: { type: 'uri', label: '📝 บันทึกข้อมูลติดตาม', uri: saveUri },
         },
+        ...(isHighRisk ? [{
+          type: 'button',
+          style: 'secondary',
+          height: 'sm',
+          action: { type: 'uri', label: '📋 ดูประวัติ', uri: historyUri },
+        }] : []),
       ],
     },
   };
