@@ -13,6 +13,7 @@ const FASTAPI_BASE = 'https://safemind-ai.net/api';
 const NOTIFY_URL = 'https://safe-mind-eight.vercel.app/api/notify-smiv';
 const MISSED_BASE = process.env.MISSED_APPT_BASE_URL ?? 'http://58.64.14.151/api/v2/public/index.php/api/v1';
 const MISSED_KEY = process.env.MISSED_APPT_API_KEY ?? '';
+const missedHeaders = MISSED_KEY ? { Authorization: `Bearer ${MISSED_KEY}` } : {};
 const ROLE_HOSPITAL = 6;
 
 interface HealthCenter {
@@ -75,6 +76,66 @@ async function fetchAllPages<T>(
   return all;
 }
 
+function extractMissedRows(raw: unknown): any[] {
+  if (Array.isArray(raw)) return raw;
+  if (raw && typeof raw === 'object') {
+    const r = raw as Record<string, unknown>;
+    if (Array.isArray(r.data)) return r.data;
+    if (Array.isArray(r.items)) return r.items;
+  }
+  return [];
+}
+
+/**
+ * เซิร์ฟเวอร์ PNNH ค่อนข้างช้า/ไม่เสถียร — ยิงซ้ำหน้าเดิมสองครั้งอาจได้คนละผลลัพธ์กัน
+ * (บางคนหาย บางคนซ้ำข้ามหน้า) retry ก่อนค่อยยอมแพ้ต่อหน้า ลดโอกาสตกหล่น
+ */
+async function withRetry<T>(fn: () => Promise<T>, retries = 2, delayMs = 800): Promise<T> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (attempt < retries) await new Promise((r) => setTimeout(r, delayMs * (attempt + 1)));
+    }
+  }
+  throw lastErr;
+}
+
+/**
+ * ดึง smi-v-missed-appointment ทุกหน้า — endpoint นี้ cap per_page ไว้ที่ 100 เสมอ
+ * ไม่ว่าจะขอ per_page เท่าไหร่ก็ตาม (ต่างจาก endpoint ของเราเองที่ /v-patients ฯลฯ)
+ * ถ้าไม่วน page ให้ครบจะได้ข้อมูลแค่หน้าแรก ตกหล่นคนที่เหลือ (สาเหตุที่นับจำนวนไม่ตรงกับแอป)
+ */
+async function fetchAllMissedAppointments(params: Record<string, string | number>): Promise<any[]> {
+  const base = { ...params, per_page: 100 };
+  const fetchPage = (page: number) =>
+    axios
+      .get(`${MISSED_BASE}/smi-v-missed-appointment`, { headers: missedHeaders, params: { ...base, page } })
+      .then((r) => r.data);
+
+  const first = await withRetry(() => fetchPage(1));
+  const all = extractMissedRows(first);
+  const totalPages = (first as any)?.meta?.total_pages ?? 1;
+  if (totalPages <= 1) return all;
+
+  const PAGE_BATCH = 20;
+  for (let start = 2; start <= totalPages; start += PAGE_BATCH) {
+    const pages = Array.from({ length: Math.min(PAGE_BATCH, totalPages - start + 1) }, (_, i) => start + i);
+    const results = await Promise.all(
+      pages.map((p) =>
+        withRetry(() => fetchPage(p)).then(extractMissedRows).catch((err) => {
+          console.warn(`smi-v-missed-appointment: page ${p} failed after retries`, err.message);
+          return [] as any[];
+        })
+      )
+    );
+    results.forEach((rows) => all.push(...rows));
+  }
+  return all;
+}
+
 export default async function handler(req: any, res: any) {
   // ป้องกันไม่ให้ใครเรียก endpoint นี้ได้นอกจาก Vercel Cron
   const cronSecret = process.env.CRON_SECRET;
@@ -90,13 +151,12 @@ export default async function handler(req: any, res: any) {
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
     );
     const apiHeaders = { Authorization: `Bearer ${tokenRes.data.access_token}` };
-    const missedHeaders = MISSED_KEY ? { Authorization: `Bearer ${MISSED_KEY}` } : {};
 
     const today = new Date();
     const oneMonthAgo = new Date(today);
     oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
 
-    const [allVPatients, allSummary, centersRes, missedRes, visitedItems, pendingRes] = await Promise.all([
+    const [allVPatients, allSummary, centersRes, missedRows, visitedItems, pendingRes] = await Promise.all([
       fetchAllPages<any>((skip, limit) =>
         axios.get(`${FASTAPI_BASE}/v-patients`, { headers: apiHeaders, params: { skip, limit } }).then((r) => r.data)
       ),
@@ -104,14 +164,10 @@ export default async function handler(req: any, res: any) {
         axios.get(`${FASTAPI_BASE}/v-patient-summary`, { headers: apiHeaders, params: { skip, limit } }).then((r) => r.data)
       ),
       axios.get(`${FASTAPI_BASE}/health-centers`, { headers: apiHeaders, params: { limit: 500 } }),
-      axios.get(`${MISSED_BASE}/smi-v-missed-appointment`, {
-        headers: missedHeaders,
-        params: {
-          nextdate_from: toIsoDate(oneMonthAgo),
-          nextdate_to: toIsoDate(today),
-          missed_days_min: 8,
-          per_page: 500,
-        },
+      fetchAllMissedAppointments({
+        nextdate_from: toIsoDate(oneMonthAgo),
+        nextdate_to: toIsoDate(today),
+        missed_days_min: 8,
       }),
       fetchAllPages<any>((skip, limit) =>
         axios.get(`${FASTAPI_BASE}/visit-followup-views`, { headers: apiHeaders, params: { skip, limit } })
@@ -131,9 +187,6 @@ export default async function handler(req: any, res: any) {
     const ourHns = new Set<string>(
       allSummary.filter((s: any) => s.result).map((s: any) => normalizeHn(s.hn))
     );
-
-    const missedRaw = missedRes.data;
-    const missedRows: any[] = Array.isArray(missedRaw) ? missedRaw : (missedRaw?.data ?? missedRaw?.items ?? []);
 
     const vPatientMap = new Map<string, any>();
     allVPatients.forEach((p: any) => vPatientMap.set(p.hn, p));
