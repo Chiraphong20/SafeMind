@@ -43,6 +43,63 @@ function findHospitalForPatient(
   );
 }
 
+const MISSED_BASE = process.env.MISSED_APPT_BASE_URL ?? 'http://58.64.14.151/api/v2/public/index.php/api/v1';
+const MISSED_KEY = process.env.MISSED_APPT_API_KEY ?? '';
+const missedHeaders = MISSED_KEY ? { Authorization: `Bearer ${MISSED_KEY}` } : {};
+
+function extractMissedRows(raw: unknown): any[] {
+  if (Array.isArray(raw)) return raw;
+  if (raw && typeof raw === 'object') {
+    const r = raw as Record<string, unknown>;
+    if (Array.isArray(r.data)) return r.data;
+    if (Array.isArray(r.items)) return r.items;
+  }
+  return [];
+}
+
+async function withRetry<T>(fn: () => Promise<T>, retries = 2, delayMs = 800): Promise<T> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (attempt < retries) await new Promise((r) => setTimeout(r, delayMs * (attempt + 1)));
+    }
+  }
+  throw lastErr;
+}
+
+/**
+ * smi-v-missed-appointment — scope เฉพาะผู้ป่วย SMI-V อยู่แล้วโดย endpoint เอง (ต่างจาก missed_appointment
+ * เดิมที่เป็นนัดทั้งโรงพยาบาล ~34,000 แถว ดึงมาแค่ 500 แถวแรกแทบไม่มีทางเจอเคส SMI-V ที่ต้องการเลย)
+ * cap per_page ไว้ที่ 100 เสมอ ต้องวน page ให้ครบ + retry เพราะเซิร์ฟเวอร์ไม่เสถียร
+ */
+async function fetchAllMissedAppointments(params: Record<string, string | number>): Promise<any[]> {
+  const base = { ...params, per_page: 100 };
+  const fetchPage = (page: number) =>
+    axios
+      .get(`${MISSED_BASE}/smi-v-missed-appointment`, { headers: missedHeaders, params: { ...base, page } })
+      .then((r) => r.data);
+
+  const first = await withRetry(() => fetchPage(1));
+  const all = extractMissedRows(first);
+  const totalPages = (first as any)?.meta?.total_pages ?? 1;
+  if (totalPages <= 1) return all;
+
+  const PAGE_BATCH = 20;
+  for (let start = 2; start <= totalPages; start += PAGE_BATCH) {
+    const pages = Array.from({ length: Math.min(PAGE_BATCH, totalPages - start + 1) }, (_, i) => start + i);
+    const results = await Promise.all(
+      pages.map((p) =>
+        withRetry(() => fetchPage(p)).then(extractMissedRows).catch(() => [] as any[])
+      )
+    );
+    results.forEach((rows) => all.push(...rows));
+  }
+  return all;
+}
+
 // ดึงข้อมูล user จาก line_user_id ด้วย machine token
 async function getUserByLineId(lineUserId: string): Promise<(UserInfo & { health_center_name: string | null }) | null> {
   try {
@@ -116,26 +173,30 @@ async function fetchCaseSummary(user: UserInfo): Promise<{ highRisk: number; mis
       return isNaN(d.getTime()) || d.getTime() < today;
     }).length;
 
-    // ดึงเคสขาดนัด — จับคู่ รพ.สต. ผ่าน v_patients (missed_appointment ไม่มี tmbpart/moopart ของตัวเอง)
+    // ดึงเคสขาดนัด — smi-v-missed-appointment (scope เฉพาะ SMI-V อยู่แล้ว, ต่างจาก missed_appointment เดิม
+    // ที่เป็นนัดทั้งโรงพยาบาล ~34,000 แถว) จับคู่ รพ.สต. ผ่าน v_patients (endpoint นี้ไม่มี tmbpart/moopart เอง)
     const vPatientMap = new Map<string, any>();
     allVPatients.forEach((p: any) => vPatientMap.set(p.hn, p));
 
-    const MISSED_BASE = process.env.MISSED_APPT_BASE_URL ?? 'http://58.64.14.151/api/v2/public/index.php/api/v1';
-    const MISSED_KEY  = process.env.MISSED_APPT_API_KEY ?? '';
-    const fromDate = new Date(); fromDate.setDate(fromDate.getDate() - 90);
+    const fromDate = new Date(); fromDate.setMonth(fromDate.getMonth() - 1);
     const toDate = new Date();
     const fmt = (d: Date) => d.toISOString().slice(0, 10);
-    const missedRes = await axios.get(
-      `${MISSED_BASE}/missed_appointment?nextdate_from=${fmt(fromDate)}&nextdate_to=${fmt(toDate)}&per_page=500&page=1`,
-      { headers: MISSED_KEY ? { Authorization: `Bearer ${MISSED_KEY}` } : {} }
-    ).catch(() => null);
-    const missedRaw = missedRes?.data;
-    const allMissed: any[] = Array.isArray(missedRaw) ? missedRaw : (missedRaw?.data ?? missedRaw?.items ?? []);
+    const allMissed = await fetchAllMissedAppointments({
+      nextdate_from: fmt(fromDate),
+      nextdate_to: fmt(toDate),
+      missed_days_min: 8,
+    }).catch(() => [] as any[]);
 
-    const missed = allMissed.filter((row: any) => {
+    // ผู้ป่วย 1 คน อาจมีนัดที่ขาดหลายครั้ง (หลายแถว) — dedupe ด้วย hn ก่อนนับ ไม่งั้นนับคนซ้ำ
+    const missedByHn = new Map<string, any>();
+    allMissed.forEach((row: any) => {
+      if ((row.missed_days ?? 0) <= 7) return;
       const pt = vPatientMap.get(row.hn);
-      return pt ? inMyHc(pt) : false;
-    }).length;
+      if (!pt || !inMyHc(pt)) return;
+      const existing = missedByHn.get(row.hn);
+      if (!existing || (row.missed_days ?? 0) > (existing.missed_days ?? 0)) missedByHn.set(row.hn, row);
+    });
+    const missed = missedByHn.size;
 
     return { highRisk, missed };
   } catch {
@@ -383,28 +444,32 @@ async function fetchUrgentPatients(user: UserInfo): Promise<Array<{
       area: `หมู่ ${p.moopart ?? '-'}`,
     }));
 
-    // ขาดนัด จาก missed appointment API
-    const MISSED_BASE = process.env.MISSED_APPT_BASE_URL ?? 'http://58.64.14.151/api/v2/public/index.php/api/v1';
-    const MISSED_KEY = process.env.MISSED_APPT_API_KEY ?? '';
-    const fromDate = new Date(); fromDate.setDate(fromDate.getDate() - 90);
+    // ขาดนัด — smi-v-missed-appointment (scope เฉพาะ SMI-V อยู่แล้ว, ต่างจาก missed_appointment เดิม
+    // ที่เป็นนัดทั้งโรงพยาบาล ~34,000 แถว ดึงมาแค่หน้าแรกแทบไม่มีทางเจอเคส SMI-V ที่ต้องการเลย)
+    const fromDate = new Date(); fromDate.setMonth(fromDate.getMonth() - 1);
     const toDate = new Date();
     const fmt = (d: Date) => d.toISOString().slice(0, 10);
-    const missedRes = await axios.get(
-      `${MISSED_BASE}/missed_appointment?nextdate_from=${fmt(fromDate)}&nextdate_to=${fmt(toDate)}&per_page=200&page=1`,
-      { headers: MISSED_KEY ? { Authorization: `Bearer ${MISSED_KEY}` } : {} }
-    ).catch(() => null);
-    const rawMissed = missedRes?.data;
-    const allMissed: any[] = Array.isArray(rawMissed) ? rawMissed : (rawMissed?.data ?? rawMissed?.items ?? []);
+    const allMissed = await fetchAllMissedAppointments({
+      nextdate_from: fmt(fromDate),
+      nextdate_to: fmt(toDate),
+      missed_days_min: 8,
+    }).catch(() => [] as any[]);
     const seenHns = new Set(highRisk.map(p => p.hn));
     // missed_appointment ไม่มี tmbpart/moopart ของตัวเอง ต้อง join จาก v_patients (allV) ก่อนค่อยจับคู่ รพ.สต.
     const vPatientMap = new Map<string, any>();
     allV.forEach((p: any) => vPatientMap.set(p.hn, p));
-    const missed = allMissed
-      .filter((p: any) => {
-        const pt = vPatientMap.get(String(p.hn ?? ''));
-        return pt ? areaMatch(pt) : false;
-      })
-      .filter((p: any) => !seenHns.has(String(p.hn ?? '')))
+    // ผู้ป่วย 1 คน อาจมีนัดที่ขาดหลายครั้ง (หลายแถว) — dedupe ด้วย hn ก่อน ไม่งั้นขึ้นซ้ำใน carousel
+    const missedByHn = new Map<string, any>();
+    allMissed
+      .filter((p: any) => (p.missed_days ?? 0) > 7)
+      .forEach((p: any) => {
+        const hn = String(p.hn ?? '');
+        const pt = vPatientMap.get(hn);
+        if (!pt || !areaMatch(pt) || seenHns.has(hn)) return;
+        const existing = missedByHn.get(hn);
+        if (!existing || (p.missed_days ?? 0) > (existing.missed_days ?? 0)) missedByHn.set(hn, p);
+      });
+    const missed = Array.from(missedByHn.values())
       .slice(0, 6)
       .map((p: any) => ({
         hn: String(p.hn ?? ''),
