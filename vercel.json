@@ -18,5 +18,11 @@
       "source": "/:path*",
       "destination": "/index.html"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/notify-smiv",
+      "schedule": "0 0 * * *"
+    }
   ]
 }
