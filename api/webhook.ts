@@ -11,7 +11,37 @@ type UserInfo = {
   tmbpart: string | null;
   addressid: string | null;
   role_id: number | null;
+  health_center_id: number | null;
 };
+
+interface HealthCenter {
+  id: number;
+  addressid?: string | null;
+  hospital_name?: string | null;
+  village_list?: number[] | null;
+}
+
+/** เหมือน src/lib/findHospitalForPatient.ts ใน sm_FontEnd เป๊ะ — จับคู่ รพ.สต. ของผู้ป่วยจากตำบล+หมู่บ้าน */
+function findHospitalForPatient(
+  p: { tmbpart?: string | null; moopart?: string | null },
+  centers: HealthCenter[]
+): HealthCenter | null {
+  const ptTmb = (p.tmbpart ?? '').trim().padStart(2, '0');
+  const ptMoo = parseInt(p.moopart ?? '0', 10);
+  const inTambon = centers.filter((hc) => hc.addressid && String(hc.addressid).slice(4, 6) === ptTmb);
+  if (inTambon.length === 0) return null;
+  const exact = inTambon.find((hc) => {
+    const villages = Array.isArray(hc.village_list) ? hc.village_list : [];
+    return villages.length > 0 && villages.includes(ptMoo);
+  });
+  return (
+    exact
+    ?? (inTambon.length === 1 ? inTambon[0] : undefined)
+    ?? inTambon.find((hc) => !Array.isArray(hc.village_list) || hc.village_list.length === 0)
+    ?? inTambon[0]
+    ?? null
+  );
+}
 
 // ดึงข้อมูล user จาก line_user_id ด้วย machine token
 async function getUserByLineId(lineUserId: string): Promise<(UserInfo & { health_center_name: string | null }) | null> {
@@ -43,6 +73,7 @@ async function getUserByLineId(lineUserId: string): Promise<(UserInfo & { health
       tmbpart: u.tmbpart ?? null,
       addressid: u.addressid ?? null,
       role_id: u.role_id ?? null,
+      health_center_id: u.health_center_id != null ? Number(u.health_center_id) : null,
     };
   } catch (err: any) {
     console.error('[getUserByLineId] unexpected error:', err.message);
@@ -50,8 +81,11 @@ async function getUserByLineId(lineUserId: string): Promise<(UserInfo & { health
   }
 }
 
-// ดึงจำนวนเคส High Risk + ขาดนัด ตามพื้นที่ของ user
+// ดึงจำนวนเคส High Risk + ขาดนัด เฉพาะ รพ.สต. ของ user เท่านั้น (จับคู่ด้วย health_center_id จริง ไม่ใช่ tmbpart/moopart ดิบ)
 async function fetchCaseSummary(user: UserInfo): Promise<{ highRisk: number; missed: number }> {
+  // ไม่รู้ว่า user สังกัด รพ.สต. ไหน — ไม่แสดงข้อมูลเลย ดีกว่าเดาแล้วโชว์ของทั้งอำเภอผิดคน
+  if (user.health_center_id == null) return { highRisk: 0, missed: 0 };
+
   try {
     const tokenRes = await axios.post(
       `${FASTAPI_BASE}/token`,
@@ -60,22 +94,17 @@ async function fetchCaseSummary(user: UserInfo): Promise<{ highRisk: number; mis
     );
     const authHeader = { Authorization: `Bearer ${tokenRes.data.access_token}` };
 
-    // ดึง v-patients (ผู้ป่วยที่มีข้อมูล SMI-V)
-    const vRes = await axios.get(`${FASTAPI_BASE}/v-patients?limit=500`, { headers: authHeader })
-      .catch(() => null);
+    const [vRes, centersRes] = await Promise.all([
+      axios.get(`${FASTAPI_BASE}/v-patients?limit=500`, { headers: authHeader }).catch(() => null),
+      axios.get(`${FASTAPI_BASE}/health-centers?limit=500`, { headers: authHeader }).catch(() => null),
+    ]);
     const allVPatients: any[] = vRes?.data?.items ?? (Array.isArray(vRes?.data) ? vRes?.data : []);
+    const centers: HealthCenter[] = centersRes?.data?.items ?? [];
 
-    // กรองตามพื้นที่ — VHV (role 5): ใช้ moopart+tmbpart, รพ.สต. (role 6+): ใช้ tmbpart
-    const moo = user.moopart?.trim() ?? null;
-    const tmb = user.tmbpart?.trim() ?? null;
+    const inMyHc = (p: { tmbpart?: string | null; moopart?: string | null }): boolean =>
+      findHospitalForPatient(p, centers)?.id === user.health_center_id;
 
-    const areaPatients = allVPatients.filter((p: any) => {
-      const pTmb = p.tmbpart?.trim() ?? null;
-      const pMoo = p.moopart?.trim() ?? null;
-      if (!tmb) return true; // ถ้าไม่มีพื้นที่ ให้แสดงทั้งหมด
-      if (moo && user.role_id === 5) return pMoo === moo && pTmb === tmb;
-      return pTmb === tmb;
-    });
+    const areaPatients = allVPatients.filter(inMyHc);
 
     const today = Date.now();
     const highRisk = areaPatients.filter((p: any) => {
@@ -87,7 +116,10 @@ async function fetchCaseSummary(user: UserInfo): Promise<{ highRisk: number; mis
       return isNaN(d.getTime()) || d.getTime() < today;
     }).length;
 
-    // ดึงเคสขาดนัด
+    // ดึงเคสขาดนัด — จับคู่ รพ.สต. ผ่าน v_patients (missed_appointment ไม่มี tmbpart/moopart ของตัวเอง)
+    const vPatientMap = new Map<string, any>();
+    allVPatients.forEach((p: any) => vPatientMap.set(p.hn, p));
+
     const MISSED_BASE = process.env.MISSED_APPT_BASE_URL ?? 'http://58.64.14.151/api/v2/public/index.php/api/v1';
     const MISSED_KEY  = process.env.MISSED_APPT_API_KEY ?? '';
     const fromDate = new Date(); fromDate.setDate(fromDate.getDate() - 90);
@@ -100,12 +132,9 @@ async function fetchCaseSummary(user: UserInfo): Promise<{ highRisk: number; mis
     const missedRaw = missedRes?.data;
     const allMissed: any[] = Array.isArray(missedRaw) ? missedRaw : (missedRaw?.data ?? missedRaw?.items ?? []);
 
-    const missed = allMissed.filter((p: any) => {
-      const pTmb = p.tmbpart?.trim() ?? null;
-      const pMoo = p.moopart?.trim() ?? null;
-      if (!tmb) return true;
-      if (moo && user.role_id === 5) return pMoo === moo && pTmb === tmb;
-      return pTmb === tmb;
+    const missed = allMissed.filter((row: any) => {
+      const pt = vPatientMap.get(row.hn);
+      return pt ? inMyHc(pt) : false;
     }).length;
 
     return { highRisk, missed };
@@ -326,23 +355,20 @@ async function getMachineToken(): Promise<string> {
   return r.data.access_token as string;
 }
 
-// ดึงรายชื่อเคสเร่งด่วน (High Risk + ขาดนัด) ตามพื้นที่ของ user
+// ดึงรายชื่อเคสเร่งด่วน (High Risk + ขาดนัด) เฉพาะ รพ.สต. ของ user เท่านั้น (จับคู่ด้วย health_center_id จริง)
 async function fetchUrgentPatients(user: UserInfo): Promise<Array<{
   hn: string; name: string; type: 'hr' | 'ms'; area: string;
 }>> {
+  // ไม่รู้ว่า user สังกัด รพ.สต. ไหน — ไม่แสดงรายชื่อเลย ดีกว่าเดาแล้วโชว์ของทั้งอำเภอผิดคน
+  if (user.health_center_id == null) return [];
+
   try {
     const jwt = await getMachineToken();
     const authHeader = { Authorization: `Bearer ${jwt}` };
-    const moo = user.moopart?.trim() ?? null;
-    const tmb = user.tmbpart?.trim() ?? null;
 
-    const areaMatch = (p: any) => {
-      const pTmb = p.tmbpart?.trim() ?? null;
-      const pMoo = p.moopart?.trim() ?? null;
-      if (!tmb) return true;
-      if (moo && user.role_id === 5) return pMoo === moo && pTmb === tmb;
-      return pTmb === tmb;
-    };
+    const centersRes = await axios.get(`${FASTAPI_BASE}/health-centers?limit=500`, { headers: authHeader }).catch(() => null);
+    const centers: HealthCenter[] = centersRes?.data?.items ?? [];
+    const areaMatch = (p: any) => findHospitalForPatient(p, centers)?.id === user.health_center_id;
 
     // High Risk จาก v-patients
     const vRes = await axios.get(`${FASTAPI_BASE}/v-patients?limit=500`, { headers: authHeader }).catch(() => null);
@@ -370,14 +396,21 @@ async function fetchUrgentPatients(user: UserInfo): Promise<Array<{
     const rawMissed = missedRes?.data;
     const allMissed: any[] = Array.isArray(rawMissed) ? rawMissed : (rawMissed?.data ?? rawMissed?.items ?? []);
     const seenHns = new Set(highRisk.map(p => p.hn));
-    const missed = allMissed.filter(areaMatch)
+    // missed_appointment ไม่มี tmbpart/moopart ของตัวเอง ต้อง join จาก v_patients (allV) ก่อนค่อยจับคู่ รพ.สต.
+    const vPatientMap = new Map<string, any>();
+    allV.forEach((p: any) => vPatientMap.set(p.hn, p));
+    const missed = allMissed
+      .filter((p: any) => {
+        const pt = vPatientMap.get(String(p.hn ?? ''));
+        return pt ? areaMatch(pt) : false;
+      })
       .filter((p: any) => !seenHns.has(String(p.hn ?? '')))
       .slice(0, 6)
       .map((p: any) => ({
         hn: String(p.hn ?? ''),
         name: String(p.pt_name ?? p.patient_name ?? p.name ?? 'ไม่ทราบชื่อ'),
         type: 'ms' as const,
-        area: `หมู่ ${p.moopart ?? '-'}`,
+        area: `หมู่ ${vPatientMap.get(String(p.hn ?? ''))?.moopart ?? p.moopart ?? '-'}`,
       }));
 
     return [...highRisk, ...missed].slice(0, 12); // LINE Carousel สูงสุด 12 bubbles
