@@ -30,12 +30,14 @@ export default async function handler(req: any, res: any) {
     try {
         // 1. Insert into DB
         // Use upsert to handle cases where user might re-register before approval
+        // มาถึง endpoint นี้ได้แปลว่าผ่านหน้า PDPA/Terms ในแอปมาแล้ว (ดู SUBPATH_MAP "register" ใน sm_FontEnd)
+        // จึงบันทึก is_privacy / is_term เป็น true เสมอ ไม่พึ่งพาว่า frontend ส่งมาหรือเปล่า
         await sql`
       INSERT INTO users (
-        username, password, full_name, thai_id, phone_number, is_kyc_verified, role_id, email, line_id, line_user_id, remark, register_type, addressid, chwpart, amppart, tmbpart, moopart, police_station_id, health_center_id, status, created_at, updated_at
+        username, password, full_name, thai_id, phone_number, is_kyc_verified, role_id, email, line_id, line_user_id, remark, register_type, addressid, chwpart, amppart, tmbpart, moopart, police_station_id, health_center_id, is_privacy, is_term, status, created_at, updated_at
       )
       VALUES (
-        ${username}, ${password}, ${full_name}, ${thai_id}, ${phone_number}, ${is_kyc_verified}, ${role_id}, ${email}, ${line_id}, ${line_user_id}, ${remark}, ${register_type}, ${addressid}, ${chwpart}, ${amppart}, ${tmbpart}, ${moopart}, ${police_station_id}, ${health_center_id}, 'pending', 
+        ${username}, ${password}, ${full_name}, ${thai_id}, ${phone_number}, ${is_kyc_verified}, ${role_id}, ${email}, ${line_id}, ${line_user_id}, ${remark}, ${register_type}, ${addressid}, ${chwpart}, ${amppart}, ${tmbpart}, ${moopart}, ${police_station_id}, ${health_center_id}, true, true, 'pending',
         NOW(), NOW()
       )
       ON CONFLICT (line_user_id) DO UPDATE SET
@@ -57,6 +59,8 @@ export default async function handler(req: any, res: any) {
         moopart = EXCLUDED.moopart,
         police_station_id = EXCLUDED.police_station_id,
         health_center_id = EXCLUDED.health_center_id,
+        is_privacy = true,
+        is_term = true,
         status = 'pending',
         updated_at = NOW();
     `;
