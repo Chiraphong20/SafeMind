@@ -337,8 +337,10 @@ export default async function handler(req: any, res: any) {
           // เคส resolve รพ.สต. ได้แล้ว — ต้องตรงกับ รพ.สต. ของ user เป๊ะๆ เท่านั้น ห้ามใช้ตำบลช่วยจับคู่
           return uHcId != null && m.key === `hc:${uHcId}`;
         }
-        // fallback ตำบล (ไม่มี health_center_id ให้ resolve) — จับคู่แบบเดิม
-        return uTmb ? m.key === `tmb:${uTmb}` : true;
+        // fallback ตำบล (ผู้ป่วย resolve รพ.สต. ไม่ได้ เช่นอยู่นอกเขต) — ต้องมีตำบลตรงกันเป๊ะเท่านั้น
+        // ถ้า user ไม่มี tmbpart (unset) ต้องไม่ได้อะไรเลย ห้ามถือเป็น "รับทุกอย่าง" เด็ดขาด
+        // (เดิมเป็น true — ทำให้ user ที่ยังไม่ตั้ง tmbpart ได้รับข้อความของทุกคนที่ resolve รพ.สต. ไม่ได้ทั้งหมด)
+        return !!uTmb && m.key === `tmb:${uTmb}`;
       });
 
       for (const msg of msgToSend) {
