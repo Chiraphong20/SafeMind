@@ -41,7 +41,13 @@ const healthCenters = [
   { id: 16, addressid: "302111", hospital_name: "รพ.สต.ซับน้อย", subdistrict_name: "ต.วังไทร" },
   { id: 17, addressid: "302110", hospital_name: "รพ.สต.หนองน้ำแดง", subdistrict_name: "ต.หนองน้ำแดง" },
   { id: 18, addressid: "302106", hospital_name: "รพ.สต.บ่อทอง", subdistrict_name: "ต.หนองสาหร่าย" },
-  { id: 19, addressid: "302106", hospital_name: "รพ.สต.เฉลิมพระเกียรติฯ", subdistrict_name: "ต.หนองสาหร่าย" }
+  { id: 19, addressid: "302106", hospital_name: "รพ.สต.เฉลิมพระเกียรติฯ", subdistrict_name: "ต.หนองสาหร่าย" },
+  // PCC (Primary Care Cluster) เขตเทศบาลเมืองปากช่อง — id ตรงกับ unit_hospitals (21-24)
+  // ⚠️ ยังสมัครจริงไม่ได้จนกว่า backend จะเพิ่ม 4 แถวนี้เข้าตาราง health_centers (ดู health_center_id validation ที่ /api/register)
+  { id: 21, addressid: "", hospital_name: "PCC ปางแก", subdistrict_name: "เทศบาลเมืองปากช่อง" },
+  { id: 22, addressid: "", hospital_name: "PCC ประปา", subdistrict_name: "เทศบาลเมืองปากช่อง" },
+  { id: 23, addressid: "", hospital_name: "PCC หนองกะจะ", subdistrict_name: "เทศบาลเมืองปากช่อง" },
+  { id: 24, addressid: "", hospital_name: "PCC หนองสาหร่าย", subdistrict_name: "เทศบาลเมืองปากช่อง" }
 ];
 
 const policeStations = [
