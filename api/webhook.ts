@@ -14,35 +14,6 @@ type UserInfo = {
   health_center_id: number | null;
 };
 
-interface HealthCenter {
-  id: number;
-  addressid?: string | null;
-  hospital_name?: string | null;
-  village_list?: number[] | null;
-}
-
-/** เหมือน src/lib/findHospitalForPatient.ts ใน sm_FontEnd เป๊ะ — จับคู่ รพ.สต. ของผู้ป่วยจากตำบล+หมู่บ้าน */
-function findHospitalForPatient(
-  p: { tmbpart?: string | null; moopart?: string | null },
-  centers: HealthCenter[]
-): HealthCenter | null {
-  const ptTmb = (p.tmbpart ?? '').trim().padStart(2, '0');
-  const ptMoo = parseInt(p.moopart ?? '0', 10);
-  const inTambon = centers.filter((hc) => hc.addressid && String(hc.addressid).slice(4, 6) === ptTmb);
-  if (inTambon.length === 0) return null;
-  const exact = inTambon.find((hc) => {
-    const villages = Array.isArray(hc.village_list) ? hc.village_list : [];
-    return villages.length > 0 && villages.includes(ptMoo);
-  });
-  return (
-    exact
-    ?? (inTambon.length === 1 ? inTambon[0] : undefined)
-    ?? inTambon.find((hc) => !Array.isArray(hc.village_list) || hc.village_list.length === 0)
-    ?? inTambon[0]
-    ?? null
-  );
-}
-
 const MISSED_BASE = process.env.MISSED_APPT_BASE_URL ?? 'http://58.64.14.151/api/v2/public/index.php/api/v1';
 const MISSED_KEY = process.env.MISSED_APPT_API_KEY ?? '';
 const missedHeaders = MISSED_KEY ? { Authorization: `Bearer ${MISSED_KEY}` } : {};
@@ -151,15 +122,12 @@ async function fetchCaseSummary(user: UserInfo): Promise<{ highRisk: number; mis
     );
     const authHeader = { Authorization: `Bearer ${tokenRes.data.access_token}` };
 
-    const [vRes, centersRes] = await Promise.all([
-      axios.get(`${FASTAPI_BASE}/v-patients?limit=500`, { headers: authHeader }).catch(() => null),
-      axios.get(`${FASTAPI_BASE}/health-centers?limit=500`, { headers: authHeader }).catch(() => null),
-    ]);
+    const vRes = await axios.get(`${FASTAPI_BASE}/v-patients?limit=500`, { headers: authHeader }).catch(() => null);
     const allVPatients: any[] = vRes?.data?.items ?? (Array.isArray(vRes?.data) ? vRes?.data : []);
-    const centers: HealthCenter[] = centersRes?.data?.items ?? [];
 
-    const inMyHc = (p: { tmbpart?: string | null; moopart?: string | null }): boolean =>
-      findHospitalForPatient(p, centers)?.id === user.health_center_id;
+    // เทียบ hospital_id ตรงๆ (FK → unit_hospitals) แทนการเดาจากตำบล+หมู่บ้าน — แม่นยำกว่าและรองรับ PCC
+    const inMyHc = (p: { hospital_id?: number | null }): boolean =>
+      p.hospital_id != null && p.hospital_id === user.health_center_id;
 
     const areaPatients = allVPatients.filter(inMyHc);
 
@@ -427,9 +395,8 @@ async function fetchUrgentPatients(user: UserInfo): Promise<Array<{
     const jwt = await getMachineToken();
     const authHeader = { Authorization: `Bearer ${jwt}` };
 
-    const centersRes = await axios.get(`${FASTAPI_BASE}/health-centers?limit=500`, { headers: authHeader }).catch(() => null);
-    const centers: HealthCenter[] = centersRes?.data?.items ?? [];
-    const areaMatch = (p: any) => findHospitalForPatient(p, centers)?.id === user.health_center_id;
+    // เทียบ hospital_id ตรงๆ (FK → unit_hospitals) แทนการเดาจากตำบล+หมู่บ้าน — แม่นยำกว่าและรองรับ PCC
+    const areaMatch = (p: any) => p?.hospital_id != null && p.hospital_id === user.health_center_id;
 
     // High Risk จาก v-patients
     const vRes = await axios.get(`${FASTAPI_BASE}/v-patients?limit=500`, { headers: authHeader }).catch(() => null);
