@@ -76,7 +76,7 @@ async function getUserByLineId(lineUserId: string): Promise<(UserInfo & { health
   try {
     const tokenRes = await axios.post(
       `${FASTAPI_BASE}/token`,
-      new URLSearchParams({ username: 'admin99', password: 'admin99' }),
+      new URLSearchParams({ username: 'admin66', password: 'admin99' }),
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
     );
     const jwt: string = tokenRes.data.access_token;
@@ -117,7 +117,7 @@ async function fetchCaseSummary(user: UserInfo): Promise<{ highRisk: number; mis
   try {
     const tokenRes = await axios.post(
       `${FASTAPI_BASE}/token`,
-      new URLSearchParams({ username: 'admin99', password: 'admin99' }),
+      new URLSearchParams({ username: 'admin66', password: 'admin99' }),
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
     );
     const authHeader = { Authorization: `Bearer ${tokenRes.data.access_token}` };
@@ -378,7 +378,7 @@ function buildWelcomeFlex(name: string, hcName: string | null) {
 async function getMachineToken(): Promise<string> {
   const r = await axios.post(
     `${FASTAPI_BASE}/token`,
-    new URLSearchParams({ username: 'admin99', password: 'admin99' }),
+    new URLSearchParams({ username: 'admin66', password: 'admin99' }),
     { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
   );
   return r.data.access_token as string;

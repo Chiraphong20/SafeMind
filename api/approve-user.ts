@@ -14,10 +14,10 @@ export default async function handler(req: any, res: any) {
   if (!user_id) return res.status(400).json({ message: 'Missing user_id' });
 
   try {
-    // 1. Get machine token (admin99 — bypasses user JWT role check)
+    // 1. Get machine token (admin66 — bypasses user JWT role check)
     const tokenRes = await axios.post(
       `${FASTAPI}/token`,
-      new URLSearchParams({ username: 'admin99', password: 'admin99' }),
+      new URLSearchParams({ username: 'admin66', password: 'admin99' }),
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
     );
     const token = tokenRes.data.access_token;

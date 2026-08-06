@@ -282,7 +282,7 @@ export default async function handler(req: any, res: any) {
     // machine token
     const tokenRes = await axios.post(
       `${FASTAPI_BASE}/token`,
-      new URLSearchParams({ username: 'admin99', password: 'admin99' }),
+      new URLSearchParams({ username: 'admin66', password: 'admin99' }),
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
     );
     const apiHeaders = { Authorization: `Bearer ${tokenRes.data.access_token}` };

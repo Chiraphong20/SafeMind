@@ -16,7 +16,7 @@ const ROLE_VHV = 5;
 async function getMachineToken(): Promise<string> {
   const res = await axios.post(
     `${FASTAPI}/token`,
-    new URLSearchParams({ username: 'admin99', password: 'admin99' }),
+    new URLSearchParams({ username: 'admin66', password: 'admin99' }),
     { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
   );
   return res.data.access_token;
