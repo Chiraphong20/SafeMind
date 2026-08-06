@@ -4,7 +4,7 @@ async function getAdminToken(): Promise<string> {
   const res = await fetch(`${FASTAPI}/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ username: 'admin66', password: 'admin99' }),
+    body: new URLSearchParams({ username: 'admin66', password: '007123admin' }),
   });
   if (!res.ok) throw new Error(`token fetch failed: ${res.status}`);
   const data = await res.json();

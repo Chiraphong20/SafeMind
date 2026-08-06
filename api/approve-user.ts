@@ -17,7 +17,7 @@ export default async function handler(req: any, res: any) {
     // 1. Get machine token (admin66 — bypasses user JWT role check)
     const tokenRes = await axios.post(
       `${FASTAPI}/token`,
-      new URLSearchParams({ username: 'admin66', password: 'admin99' }),
+      new URLSearchParams({ username: 'admin66', password: '007123admin' }),
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
     );
     const token = tokenRes.data.access_token;
